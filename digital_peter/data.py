@@ -31,13 +31,14 @@ class DigitalPeterDataset(Dataset):
             with open(textpath, "r", encoding="utf-8") as f:
                 text = f.read().strip()
             try:
-                self.encoded_texts.append(self.encoder.encode(text))
+                encoded_text = self.encoder.encode(text)
             except KeyError:
                 if verbose:
                     log.info(f"Skipping {uttid}, can't transcribe: {text}")
                 continue
             self.keys.append(uttid)
             self.texts.append(text)
+            self.encoded_texts.append(torch.LongTensor(encoded_text))
             img = cv2.imread(f"{imagepath}")
             img = process_image(img)
             self.images.append(torch.FloatTensor(img.transpose(2, 0, 1)))  # HxWxC -> CxHxW

@@ -3,29 +3,29 @@ import numpy as np
 
 
 def process_image(img):
-    w, h, _ = img.shape
+    height, width, _ = img.shape
+    if height > width:
+        img = np.rot90(img)
+        height, width = width, height
 
-    new_w = 128
-    new_h = int(h * (new_w / w))
-    img = cv2.resize(img, (new_h, new_w))
-    w, h, _ = img.shape
+    new_height = 128
+    new_width = int(round(width * new_height / height))
+    img = cv2.resize(img, (new_width, new_height))  # sic!
+    height, width, _ = img.shape
 
     img = img.astype('float32')
 
-    if w < 128:
-        add_zeros = np.full((128 - w, h, 3), 255)
-        img = np.concatenate((img, add_zeros))
-        w, h, _ = img.shape
+    if height < 128:
+        top_zeros_height = (128 - height) // 2
+        bottom_zeros_height = 128 - height - top_zeros_height
+        top_zeros = np.full((top_zeros_height, width, 3), 255)
+        bottom_zeros = np.full((bottom_zeros_height, width, 3), 255)
+        img = np.concatenate((top_zeros, img, bottom_zeros))
+        height, width, _ = img.shape
 
-    if h < 1024:
-        add_zeros = np.full((w, 1024 - h, 3), 255)
-        img = np.concatenate((img, add_zeros), axis=1)
-        w, h, _ = img.shape
+    if height > 128:
+        raise Exception(f"strange image size {height, width}")
 
-    if h > 1024 or w > 128:
-        dim = (1024, 128)
-        img = cv2.resize(img, dim)
+    img /= 255
 
-    img = cv2.subtract(255, img)
-    img = img / 255
     return img
