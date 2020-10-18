@@ -15,7 +15,7 @@ def setup_logger(exp_dir: Optional[Union[str, Path]] = None):
 
     if exp_dir is not None:
         exp_dir = Path(exp_dir)
-        f_handler = logging.FileHandler(exp_dir / "convert_model.log", mode="w")
+        f_handler = logging.FileHandler(exp_dir / "learning.log", mode="w")
         f_format = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
