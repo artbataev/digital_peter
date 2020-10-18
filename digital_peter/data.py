@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Union, Set
 
@@ -12,7 +13,7 @@ from digital_peter.text import TextEncoder
 
 
 class DigitalPeterDataset(Dataset):
-    def __init__(self, base_dir: Union[Path, str], uttids: Set[str], encoder: TextEncoder):
+    def __init__(self, base_dir: Union[Path, str], uttids: Set[str], encoder: TextEncoder, verbose=True):
         super().__init__()
         base_dir = Path(base_dir)
         self.trans_dir = base_dir / "words"
@@ -22,24 +23,24 @@ class DigitalPeterDataset(Dataset):
         self.encoded_texts = []
         self.keys = []
         self.encoder = encoder
+        log = logging.getLogger(__name__)
 
-        for imagepath in tqdm(self.image_dir.glob("*.jpg")):
-            key = imagepath.stem
-            if key not in uttids:
-                continue
-            textpath = self.trans_dir / f"{key}.txt"
+        for uttid in tqdm(sorted(uttids)):
+            imagepath = self.image_dir / f"{uttid}.jpg"
+            textpath = self.trans_dir / f"{uttid}.txt"
             with open(textpath, "r", encoding="utf-8") as f:
                 text = f.read().strip()
-            if not text:
-                print(imagepath, textpath, text)
+            try:
+                self.encoded_texts.append(self.encoder.encode(text))
+            except KeyError:
+                if verbose:
+                    log.info(f"Skipping {uttid}, can't transcribe")
                 continue
-            self.keys.append(key)
+            self.keys.append(uttid)
             self.texts.append(text)
             img = cv2.imread(f"{imagepath}")
             img = process_image(img)
             self.images.append(torch.FloatTensor(img.transpose(2, 0, 1)))  # HxWxC -> CxHxW
-        for text in self.texts:
-            self.encoded_texts.append(self.encoder.encode(text))
 
     def __getitem__(self, index):
         return self.images[index], self.texts[index], self.encoded_texts[index], len(self.texts[index])
