@@ -7,7 +7,14 @@ from tqdm.auto import tqdm
 
 
 class OcrLearner:
-    def __init__(self, model, optimizer, criterion, train_loader, val_loader, encoder, parl_decoder=None):
+    def __init__(self, model,
+                 optimizer,
+                 criterion,
+                 train_loader,
+                 val_loader,
+                 encoder,
+                 logits_len_fn=lambda x: x // 4 - 1,
+                 parl_decoder=None):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
@@ -15,6 +22,7 @@ class OcrLearner:
         self.val_loader = val_loader
         self.encoder = encoder
         self.parl_decoder = parl_decoder
+        self.logits_len_fn = logits_len_fn
         self.log = logging.getLogger(__name__)
 
     def train_model(self):
@@ -25,7 +33,7 @@ class OcrLearner:
             self.optimizer.zero_grad()
             logits = self.model(images, image_lengths)
             log_logits = F.log_softmax(logits, dim=-1)
-            loss = self.criterion(log_logits, encoded_texts, image_lengths // 4 - 1, text_lengths).mean()
+            loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths).mean()
             loss.backward()
             self.optimizer.step()
             if batch_idx % 100 == 0:
@@ -49,7 +57,7 @@ class OcrLearner:
                     torch.int32).cuda(), image_lengths.cuda(), text_lengths.to(torch.int32).cuda()
                 logits = self.model(images, image_lengths)
                 log_logits = F.log_softmax(logits, dim=-1)
-                loss = self.criterion(log_logits, encoded_texts, image_lengths // 4 - 1, text_lengths)
+                loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths)
                 loss_accum += loss.sum().item()
                 num_items += len(texts)
 
@@ -58,11 +66,11 @@ class OcrLearner:
                 else:
                     beam_results, beam_scores, timesteps, out_lens = self.parl_decoder.decode(
                         log_logits.transpose(0, 1).detach(),
-                        seq_lens=image_lengths // 4 - 1)
+                        seq_lens=self.logits_len_fn(image_lengths))
                 for i, ref in enumerate(texts):
                     total_chars += len(ref)
                     if greedy:
-                        hyp_len = image_lengths[i].item() // 4 - 1
+                        hyp_len = self.logits_len_fn(image_lengths[i].item())
                         hyp = self.encoder.decode_ctc(labels[i].tolist()[:hyp_len])
                     else:
                         hyp_len = out_lens[i][0]
