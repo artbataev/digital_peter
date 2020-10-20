@@ -36,6 +36,7 @@ class DigitalPeterDataset(Dataset):
             textpath = self.trans_dir / f"{uttid}.txt"
             with open(textpath, "r", encoding="utf-8") as f:
                 text = f.read().strip()
+                text = " ".join(text.split())  # remove duplicated spaces
             try:
                 encoded_text = self.encoder.encode(text)
             except KeyError:
