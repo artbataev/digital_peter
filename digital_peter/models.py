@@ -108,7 +108,7 @@ class BaselineModelBnAll(nn.Module):
 
 
 class BaselineModelBnAllNoTimePad(nn.Module):
-    def __init__(self, num_outputs):
+    def __init__(self, num_outputs, dropout=0.2, n_rnn=2, rnn_type="GRU"):
         super().__init__()
         # input: Bx3x128xL
         left_context = 19
@@ -144,9 +144,10 @@ class BaselineModelBnAllNoTimePad(nn.Module):
             nn.ReLU(),
         ])
 
-        self.rnn_dropout = nn.Dropout(0.2)
-        self.rnn = nn.GRU(input_size=512, hidden_size=256, bidirectional=True, dropout=0.2, batch_first=False,
-                          num_layers=2)
+        self.rnn_dropout = nn.Dropout(dropout)
+        rnn_type = getattr(nn, rnn_type)
+        self.rnn = rnn_type(input_size=512, hidden_size=256, bidirectional=True, dropout=dropout, batch_first=False,
+                            num_layers=n_rnn)
         self.final = nn.Linear(512, num_outputs)
 
     def forward(self, images, image_lengths):
