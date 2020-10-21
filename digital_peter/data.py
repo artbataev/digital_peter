@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn.utils.rnn as utils_rnn
 from torch.utils.data import Dataset
+from torchvision.transforms import transforms
 from tqdm.auto import tqdm
 
 from digital_peter.image import process_image
@@ -19,6 +20,7 @@ class DigitalPeterDataset(Dataset):
                  uttids: Set[str],
                  encoder: TextEncoder,
                  image_len_divisible_by=1,
+                 training=False,
                  verbose=True):
         super().__init__()
         base_dir = Path(base_dir)
@@ -29,6 +31,13 @@ class DigitalPeterDataset(Dataset):
         self.encoded_texts = []
         self.keys = []
         self.encoder = encoder
+        self.training = training
+        self.train_transforms = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.RandomRotation(degrees=2, fill=255),
+            transforms.ToTensor()
+        ])
+        self.eval_transforms = transforms.ToTensor()
         log = logging.getLogger(__name__)
 
         for uttid in tqdm(sorted(uttids)):
@@ -50,14 +59,19 @@ class DigitalPeterDataset(Dataset):
             img = process_image(img)
             width = img.shape[1]
             if width % image_len_divisible_by != 0:
-                right_add = np.ones([img.shape[0], image_len_divisible_by - width % image_len_divisible_by, 3],
-                                    dtype=np.float32)
+                right_add = np.full([img.shape[0], image_len_divisible_by - width % image_len_divisible_by, 3], 255,
+                                    dtype=img.dtype)
                 img = np.concatenate((img, right_add), axis=1)
 
-            self.images.append(torch.FloatTensor(img.transpose(2, 0, 1)))  # HxWxC -> CxHxW
+            self.images.append(img)  # HxWxC -> CxHxW later
 
     def __getitem__(self, index):
-        return self.images[index], self.texts[index], self.encoded_texts[index], len(self.texts[index])
+        img = self.images[index]
+        if self.training:
+            img = self.train_transforms(img)
+        else:
+            img = self.eval_transforms(img)
+        return img, self.texts[index], self.encoded_texts[index], len(self.texts[index]), self.keys[index]
 
     def __len__(self):
         return len(self.texts)
