@@ -34,7 +34,7 @@ class DigitalPeterDataset(Dataset):
         self.training = training
         self.train_transforms = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.RandomRotation(degrees=2, fill=255),
+            transforms.RandomRotation(degrees=4, fill=255),
             transforms.ToTensor()
         ])
         self.eval_transforms = transforms.ToTensor()
