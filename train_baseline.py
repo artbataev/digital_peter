@@ -123,7 +123,8 @@ def main():
     num_epochs = args.epochs
 
     if args.model == "base":
-        model = BaselineModelBnAllNoTimePad(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type)
+        model = BaselineModelBnAllNoTimePad(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
+                                            n_rnn=args.rnn_layers)
     else:
         raise Exception("unknown model")
     model = model.cuda()
