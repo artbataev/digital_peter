@@ -1,4 +1,5 @@
 import logging
+import random
 from pathlib import Path
 from typing import Union, Set
 
@@ -7,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn.utils.rnn as utils_rnn
 from torch.utils.data import Dataset
+from torchvision.transforms import functional
 from torchvision.transforms import transforms
 from tqdm.auto import tqdm
 
@@ -32,12 +34,26 @@ class DigitalPeterDataset(Dataset):
         self.keys = []
         self.encoder = encoder
         self.training = training
+
+        def pad_pil_image(img):
+            tail = img.width % image_len_divisible_by
+            if tail == 0:
+                return img
+            # args for pad: left, top, right, bottom
+            return functional.pad(img, (0, 0, image_len_divisible_by - tail, 0), padding_mode="edge")
+
+        def random_stretch_image(img):
+            return functional.resize(img, (img.height, int(img.width * random.uniform(0.95, 1.05))))
+
         self.train_transforms = transforms.Compose([
             transforms.ToPILImage(),
             transforms.RandomRotation(degrees=4, fill=255),
+            transforms.Lambda(random_stretch_image),
+            transforms.Lambda(pad_pil_image),
             transforms.ToTensor()
         ])
         self.eval_transforms = transforms.ToTensor()
+        self.image_len_divisible_by = image_len_divisible_by
         log = logging.getLogger(__name__)
 
         for uttid in tqdm(sorted(uttids)):
