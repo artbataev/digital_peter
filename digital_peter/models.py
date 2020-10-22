@@ -146,16 +146,21 @@ class BaselineModelBnAllNoTimePad(nn.Module):
 
         self.rnn_dropout = nn.Dropout(dropout)
         rnn_type = getattr(nn, rnn_type)
-        self.rnn = rnn_type(input_size=512, hidden_size=256, bidirectional=True, dropout=dropout, batch_first=False,
+        self.n_rnn = n_rnn
+        if n_rnn > 0:
+            self.rnn = rnn_type(input_size=512, hidden_size=256, bidirectional=True, dropout=dropout, batch_first=False,
                             num_layers=n_rnn)
+        else:
+            self.rnn = nn.Identity()
         self.final = nn.Linear(512, num_outputs)
 
     def forward(self, images, image_lengths):
         output = self.encoder(images)  # Bx512x1x(L/4-1)
         output = output.squeeze(dim=2).permute(2, 0, 1)  # LxBxC
         output = self.rnn_dropout(output)
-        output = utils_rnn.pack_padded_sequence(output, image_lengths // 4, batch_first=False)
-        output = self.rnn(output)[0]
-        output = utils_rnn.pad_packed_sequence(output)[0]
+        if self.n_rnn:
+            output = utils_rnn.pack_padded_sequence(output, image_lengths // 4, batch_first=False)
+            output = self.rnn(output)[0]
+            output = utils_rnn.pad_packed_sequence(output)[0]
         logits = self.final(output)
         return logits  # LxBxC
