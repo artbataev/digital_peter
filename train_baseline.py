@@ -20,7 +20,7 @@ from digital_peter.logging_utils import setup_logger
 from digital_peter.models import BaselineModelBnAllNoTimePad
 from digital_peter.text import TextEncoder
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(__file__).parent / "data"
 
 
 def set_seed():
@@ -30,7 +30,7 @@ def set_seed():
     np.random.seed(111)
 
 
-def get_chars(exclude_eng=True, min_char_freq=1) -> Set[str]:
+def get_chars(exclude_eng=False, min_char_freq=5) -> Set[str]:
     english = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w'}
     # with open(DATA_DIR / "chars_set.pkl", "rb") as f:
     #     all_chars = pickle.load(f)
