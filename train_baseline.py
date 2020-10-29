@@ -14,10 +14,10 @@ import torch.optim as optim
 from ctcdecode import CTCBeamDecoder
 from torch.utils.data import DataLoader
 
+from digital_peter import models
 from digital_peter.data import DigitalPeterDataset, collate_fn
 from digital_peter.learning import OcrLearner
 from digital_peter.logging_utils import setup_logger
-from digital_peter.models import BaselineModelBnAllNoTimePad
 from digital_peter.text import TextEncoder
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -66,7 +66,7 @@ def main():
     parser.add_argument("--bs", type=int, default=10, help="batch size")
     parser.add_argument("--optim", type=str, choices={"adam", "adabelief"}, default="adam")
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
-    parser.add_argument("--model", default="base", choices={"base"})
+    parser.add_argument("--model", default="base", choices={"base", "resnetibm1"})
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--exclude-eng", default=False, action="store_true")
     parser.add_argument("--min-char-freq", default=5, type=int)
@@ -123,8 +123,12 @@ def main():
     num_epochs = args.epochs
 
     if args.model == "base":
-        model = BaselineModelBnAllNoTimePad(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
-                                            n_rnn=args.rnn_layers)
+        model = models.BaselineModelBnAllNoTimePad(num_outputs=num_outputs, dropout=args.dropout,
+                                                   rnn_type=args.rnn_type,
+                                                   n_rnn=args.rnn_layers)
+    elif args.model == "resnetibm1":
+        model = models.BaselineResnetIbm1(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
+                                           n_rnn=args.rnn_layers)
     else:
         raise Exception("unknown model")
     model = model.cuda()
