@@ -44,8 +44,8 @@ class BaselineResnetIbm1(nn.Module):
     def __init__(self, num_outputs, dropout=0.2, n_rnn=2, rnn_type="GRU"):
         super().__init__()
         self.num_outputs = num_outputs
-        left_context = 54
-        right_context = 54
+        left_context = 62
+        right_context = 62
         self.encoder = nn.Sequential(*[
             nn.ReplicationPad2d([left_context, right_context, 0, 0]),
             nn.Conv2d(3, 64, kernel_size=(5, 5), padding=(2, 0)),  # 128, time -4
@@ -58,10 +58,13 @@ class BaselineResnetIbm1(nn.Module):
             ResBlock(256, 256),  # 4, time -4
             ResBlock(256, 512, stride_h=2),  # to 2, time -4
             ResBlock(512, 512, stride_h=2),  # to 1, time -4
+            ResBlock(512, 512),  # 1, time -4
             LambdaModule(lambda x: x.squeeze(2)),  # BxCx1xL -> BxCxL
             nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Conv1d(512, 512, kernel_size=1),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
             LambdaModule(lambda x: x.permute(2, 0, 1)),  # LxBxC
         ])
         self.rnn_dropout = nn.Dropout(dropout)
