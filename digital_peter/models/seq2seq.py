@@ -137,25 +137,30 @@ class AttnDecoderRnn(nn.Module):
             input_labels = torch.cat((input_labels_start, input_labels), dim=1)
             output = self.embedding(input_labels)
             if self.rnn1 is not None:
-                # TODO: pack
+                # TODO: pack?
+                output, hidden1 = self.rnn1(output, hidden1)
+            output, _ = self.attn(output, encoder_outputs, encoder_output_lengths)
+            if self.rnn2 is not None:
+                # TODO: pack?
+                output, hidden2 = self.rnn2(output, hidden2)
+            output = F.log_softmax(self.fc(output), dim=-1)
+            return output
+
+        input_labels = input_labels_start
+        results = []
+        is_eos = torch.tensor([False for _ in range(batch_size)], dtype=torch.bool, device=device)
+        for _ in range(self.max_length):
+            output = self.embedding(input_labels)
+            if self.rnn1 is not None:
                 output, hidden1 = self.rnn1(output, hidden1)
             output, _ = self.attn(output, encoder_outputs, encoder_output_lengths)
             if self.rnn2 is not None:
                 output, hidden2 = self.rnn2(output, hidden2)
             output = F.log_softmax(self.fc(output), dim=-1)
-        else:
-            input_labels = input_labels_start
-            results = []
-            for _ in range(self.max_length):
-                output = self.embedding(input_labels)
-                if self.rnn1 is not None:
-                    # TODO: pack
-                    output, hidden1 = self.rnn1(output, hidden1)
-                output, _ = self.attn(output, encoder_outputs, encoder_output_lengths)
-                if self.rnn2 is not None:
-                    output, hidden2 = self.rnn2(output, hidden2)
-                output = F.log_softmax(self.fc(output), dim=-1)
-                results.append(output)
-                input_labels = torch.topk(output, 1, dim=-1)[1].squeeze(-1)
-            output = torch.cat(results, dim=1)
+            results.append(output)
+            input_labels = torch.topk(output, 1, dim=-1)[1].squeeze(-1)
+            is_eos |= input_labels.squeeze(-1) == self.eos
+            if is_eos.sum() == batch_size:
+                break
+        output = torch.cat(results, dim=1)
         return output
