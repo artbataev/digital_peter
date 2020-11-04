@@ -36,10 +36,10 @@ class Attention(nn.Module):
     """
 
     def __init__(self, dimensions, attention_type='general', use_activation=True):
-        super(Attention, self).__init__()
+        super().__init__()
 
-        if attention_type not in ['dot', 'general']:
-            raise ValueError('Invalid attention type selected.')
+        if attention_type not in {'dot', 'general'}:
+            raise ValueError('Invalid attention type')
 
         self.attention_type = attention_type
         if self.attention_type == 'general':
