@@ -35,7 +35,7 @@ class Attention(nn.Module):
          torch.Size([5, 1, 5])
     """
 
-    def __init__(self, dimensions, attention_type='general'):
+    def __init__(self, dimensions, attention_type='general', use_activation=True):
         super(Attention, self).__init__()
 
         if attention_type not in ['dot', 'general']:
@@ -47,6 +47,7 @@ class Attention(nn.Module):
 
         self.linear_out = nn.Linear(dimensions * 2, dimensions, bias=False)
         self.tanh = nn.Tanh()
+        self.use_activation = use_activation
 
     def forward(self, query, context, context_lengths=None):
         """
@@ -94,7 +95,8 @@ class Attention(nn.Module):
         # Apply linear_out on every 2nd dimension of concat
         # output -> (batch_size, output_len, dimensions)
         output = self.linear_out(combined)
-        output = self.tanh(output)
+        if self.use_activation:
+            output = self.tanh(output)
 
         return output, attention_weights
 
