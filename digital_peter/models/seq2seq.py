@@ -103,7 +103,7 @@ class Attention(nn.Module):
 
 class AttnDecoderRnn(nn.Module):
     def __init__(self, output_size, hidden_size, rnn_layers=(0, 2), embedding_dropout_p=0.1,
-                 sos=0, eos=1, pad=-1, max_length=100):
+                 sos=0, eos=1, pad=-1, max_length=100, attention=None):
         super().__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -118,7 +118,7 @@ class AttnDecoderRnn(nn.Module):
         else:
             self.embedding = nn.Sequential(*[embedding, nn.Dropout(embedding_dropout_p)])
 
-        self.attn = Attention(hidden_size)
+        self.attn = Attention(hidden_size) if attention is None else attention
 
         assert len(rnn_layers) == 2
         self.num_rnn_layers = rnn_layers
