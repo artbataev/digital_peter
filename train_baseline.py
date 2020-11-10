@@ -62,9 +62,10 @@ def main():
     parser.add_argument("--init-lr", type=float, default=1e-3)
     parser.add_argument("--final-lr", type=float, default=1e-5)
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--start-ep", default=0)
+    parser.add_argument("--start-ep", type=int, default=0)
     parser.add_argument("--bs", type=int, default=10, help="batch size")
-    parser.add_argument("--optim", type=str, choices={"adam", "adabelief"}, default="adam")
+    parser.add_argument("--optim", type=str, choices={"adam", "adabelief", "sgd"}, default="adam")
+    parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
     parser.add_argument("--model", default="base", choices={"base", "resnetibm1"})
     parser.add_argument("--dropout", type=float, default=0.2)
@@ -113,7 +114,7 @@ def main():
         cutoff_top_n=40,
         cutoff_prob=1.0,
         beam_width=100,
-        num_processes=4,
+        num_processes=6,
         blank_id=0,
         log_probs_input=True
     )
@@ -141,6 +142,8 @@ def main():
         from adabelief_pytorch import AdaBelief
         optimizer = AdaBelief(model.parameters(), lr=init_lr, eps=1e-10, betas=(0.9, 0.999), weight_decouple=False,
                               rectify=False, weight_decay=args.wd)
+    elif args.optim == "sgd":
+        optimizer = optim.SGD(model.parameters(), lr=init_lr, momentum=args.momentum, weight_decay=args.wd)
     else:
         raise Exception("unknown optimizer")
     learner = OcrLearner(model, optimizer, criterion, train_loader, val_loader, encoder,
@@ -149,7 +152,9 @@ def main():
 
     reduce_lr = optim.lr_scheduler.LambdaLR(optimizer,
                                             lambda epoch: math.exp(math.log(final_lr / init_lr) * epoch / num_epochs))
-    best_loss = float("infinity")
+    # best_loss = float("infinity")
+    best_loss = learner.val_model()
+    torch.save(learner.model.state_dict(), exp_dir / "model_best.pt")
     try:
         for i_epoch in range(args.start_ep, num_epochs):
             log.info("=" * 50)
