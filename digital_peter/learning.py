@@ -28,8 +28,9 @@ class OcrLearner:
     def train_model(self):
         self.model.train()
         for batch_idx, (images, _, encoded_texts, image_lengths, text_lengths) in enumerate(tqdm(self.train_loader)):
-            images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.to(
-                torch.int32).cuda(), image_lengths.cuda(), text_lengths.to(torch.int32).cuda()
+            images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.cuda(), \
+                                                                 image_lengths.cuda(), text_lengths.cuda()
+            encoded_texts, text_lengths = encoded_texts.to(torch.int32), text_lengths.to(torch.int32)
             self.optimizer.zero_grad()
             logits = self.model(images, image_lengths)
             log_logits = F.log_softmax(logits, dim=-1)
@@ -53,8 +54,9 @@ class OcrLearner:
         with torch.no_grad():
             for batch_idx, (images, texts, encoded_texts, image_lengths, text_lengths) in enumerate(
                     tqdm(self.val_loader)):
-                images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.to(
-                    torch.int32).cuda(), image_lengths.cuda(), text_lengths.to(torch.int32).cuda()
+                images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.cuda(), \
+                                                                     image_lengths.cuda(), text_lengths.cuda()
+                encoded_texts, text_lengths = encoded_texts.to(torch.int32), text_lengths.to(torch.int32)
                 logits = self.model(images, image_lengths)
                 log_logits = F.log_softmax(logits, dim=-1)
                 loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths)
