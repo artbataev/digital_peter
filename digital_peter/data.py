@@ -23,7 +23,8 @@ class DigitalPeterDataset(Dataset):
                  encoder: TextEncoder,
                  image_len_divisible_by=1,
                  training=False,
-                 verbose=True):
+                 verbose=True,
+                 sort=False):
         super().__init__()
         base_dir = Path(base_dir)
         self.trans_dir = base_dir / "words"
@@ -80,8 +81,14 @@ class DigitalPeterDataset(Dataset):
                 img = np.concatenate((img, right_add), axis=1)
 
             self.images.append(img)  # HxWxC -> CxHxW later
+        # self.idx2idx = list(range(len(self.images)))
+        if sort:
+            self.sort_by_len()
+            self._is_sorted = True
+        self._indices = list(range(len(self.keys)))
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
+        index = self._indices[index]
         img = self.images[index]
         if self.training:
             img = self.train_transforms(img)
@@ -91,6 +98,36 @@ class DigitalPeterDataset(Dataset):
 
     def __len__(self):
         return len(self.texts)
+
+    def sort_by_len(self):
+        indices = list(range(len(self.images)))
+        indices.sort(key=lambda i: self.images[i].shape[1])
+        self.images = [self.images[i] for i in indices]
+        self.texts = [self.texts[i] for i in indices]
+        self.encoded_texts = [self.encoded_texts[i] for i in indices]
+        self.keys = [self.keys[i] for i in indices]
+
+    def shuffle_buckets(self, batch_size: int, shuffle_parts=True):
+        if not self._is_sorted:
+            raise Exception("not sorted")
+        indices = list(range(len(self.keys)))
+        random.shuffle(indices)
+        for i in range(0, len(indices), 100 * batch_size):
+            j = min(i + 100 * batch_size, len(indices))
+            indices[i:j] = sorted(indices[i:j], key=lambda idx: self.images[idx].shape[1])
+        buckets = []
+        for i in range(0, len(indices), batch_size):
+            j = min(i + batch_size, len(indices))
+            buckets.append(list(range(i, j)))
+        if shuffle_parts:
+            random.shuffle(buckets)
+        self._indices = []
+        for bucket in buckets:
+            for i in bucket:
+                self._indices.append(i)
+
+    def shuffle(self):
+        random.shuffle(self._indices)
 
 
 def collate_fn(items):

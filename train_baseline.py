@@ -129,7 +129,7 @@ def main():
                                                    n_rnn=args.rnn_layers)
     elif args.model == "resnetibm1":
         model = models.BaselineResnetIbm1(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
-                                           n_rnn=args.rnn_layers)
+                                          n_rnn=args.rnn_layers)
     else:
         raise Exception("unknown model")
     model = model.cuda()
@@ -157,6 +157,10 @@ def main():
     torch.save(learner.model.state_dict(), exp_dir / "model_best.pt")
     try:
         for i_epoch in range(args.start_ep, num_epochs):
+            # if i_epoch == 0:
+            #     train_data.shuffle_buckets(args.bs, shuffle_parts=False)  # pseudo sortagrad
+            # else:
+            #     train_data.shuffle_buckets(args.bs, shuffle_parts=True)
             log.info("=" * 50)
             log.info(f"epoch: {i_epoch + 1}")
             learner.train_model()

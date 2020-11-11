@@ -27,6 +27,8 @@ class OcrLearner:
 
     def train_model(self):
         self.model.train()
+        tmp_loss = 0.0
+        tmp_loss_num = 0
         for batch_idx, (images, _, encoded_texts, image_lengths, text_lengths) in enumerate(tqdm(self.train_loader)):
             images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.cuda(), \
                                                                  image_lengths.cuda(), text_lengths.cuda()
@@ -37,8 +39,13 @@ class OcrLearner:
             loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths).mean()
             loss.backward()
             self.optimizer.step()
-            if batch_idx % 100 == 0:
-                logging.info(f"loss: {loss.item():.5f}")
+
+            tmp_loss_num += 1
+            tmp_loss += loss.item()
+            if (batch_idx + 1) % 100 == 0:
+                logging.info(f"loss: {tmp_loss / tmp_loss_num:.5f}")
+                tmp_loss_num = 0
+                tmp_loss = 0.0
 
     def val_model(self, greedy=True):
         if not greedy and self.parl_decoder is None:
