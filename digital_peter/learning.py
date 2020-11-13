@@ -1,9 +1,12 @@
 import logging
+from typing import Dict
 
 import editdistance
 import torch
 import torch.nn.functional as F
 from tqdm.auto import tqdm
+
+from digital_peter.data import OcrDataBatch
 
 
 class OcrLearner:
@@ -29,10 +32,13 @@ class OcrLearner:
         self.model.train()
         tmp_loss = 0.0
         tmp_loss_num = 0
-        for batch_idx, (images, _, encoded_texts, image_lengths, text_lengths) in enumerate(tqdm(self.train_loader)):
-            images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.cuda(), \
-                                                                 image_lengths.cuda(), text_lengths.cuda()
-            encoded_texts, text_lengths = encoded_texts.to(torch.int32), text_lengths.to(torch.int32)
+        ocr_data_batch: OcrDataBatch
+        for batch_idx, ocr_data_batch in enumerate(tqdm(self.train_loader)):
+            images = ocr_data_batch.images.cuda()
+            image_lengths = ocr_data_batch.image_lengths.cuda()
+            encoded_texts = ocr_data_batch.encoded_texts.cuda().to(torch.int32)  # for ctc
+            text_lengths = ocr_data_batch.text_lengths.cuda().to(torch.int32)  # for ctc
+
             self.optimizer.zero_grad()
             logits = self.model(images, image_lengths)
             log_logits = F.log_softmax(logits, dim=-1)
@@ -58,17 +64,23 @@ class OcrLearner:
         error_chars = 0
         total_words = 0
         error_words = 0
+
+        utt2log_logits: Dict[str, torch.Tensor] = dict()
+        utt2hyp: Dict[str, str] = dict()
         with torch.no_grad():
-            for batch_idx, (images, texts, encoded_texts, image_lengths, text_lengths) in enumerate(
-                    tqdm(self.val_loader)):
-                images, encoded_texts, image_lengths, text_lengths = images.cuda(), encoded_texts.cuda(), \
-                                                                     image_lengths.cuda(), text_lengths.cuda()
-                encoded_texts, text_lengths = encoded_texts.to(torch.int32), text_lengths.to(torch.int32)
+            ocr_data_batch: OcrDataBatch
+            for batch_idx, ocr_data_batch in enumerate(tqdm(self.val_loader)):
+                images = ocr_data_batch.images.cuda()
+                image_lengths = ocr_data_batch.image_lengths.cuda()
+                encoded_texts = ocr_data_batch.encoded_texts.cuda().to(torch.int32)  # for ctc
+                text_lengths = ocr_data_batch.text_lengths.cuda().to(torch.int32)  # for ctc
+                batch_size = images.shape[0]
+
                 logits = self.model(images, image_lengths)
                 log_logits = F.log_softmax(logits, dim=-1)
                 loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths)
                 loss_accum += loss.sum().item()
-                num_items += len(texts)
+                num_items += len(batch_size)
 
                 if greedy:
                     labels = logits.argmax(dim=-1).detach().cpu().numpy().transpose(1, 0)
@@ -76,15 +88,19 @@ class OcrLearner:
                     beam_results, beam_scores, timesteps, out_lens = self.parl_decoder.decode(
                         log_logits.transpose(0, 1).detach(),
                         seq_lens=self.logits_len_fn(image_lengths))
-                for i, ref in enumerate(texts):
+
+                for i, ref in enumerate(ocr_data_batch.texts):
                     total_chars += len(ref)
+                    key = ocr_data_batch.keys[i]
                     if greedy:
                         hyp_len = self.logits_len_fn(image_lengths[i].item())
                         hyp = self.encoder.decode_ctc(labels[i].tolist()[:hyp_len])
+                        utt2hyp[key] = hyp
                     else:
                         hyp_len = out_lens[i][0]
                         hyp_encoded = beam_results[i, 0, :hyp_len]
                         hyp = self.encoder.decode(hyp_encoded.numpy().tolist())
+                        utt2hyp[key] = hyp
                     error_chars += editdistance.eval(hyp, ref)
                     total_words += len(ref.split())
                     error_words += editdistance.eval(hyp.split(), ref.split())

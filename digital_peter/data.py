@@ -1,7 +1,8 @@
 import logging
 import random
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Set
+from typing import Union, Set, List
 
 import cv2
 import numpy as np
@@ -14,6 +15,25 @@ from tqdm.auto import tqdm
 
 from digital_peter.image import process_image
 from digital_peter.text import TextEncoder
+
+
+@dataclass
+class OcrDataItem:
+    key: str
+    img: torch.Tensor
+    text: str
+    encoded_text: torch.Tensor
+    encoded_text_len: int
+
+
+@dataclass
+class OcrDataBatch:
+    keys: List[str]
+    texts: List[str]
+    images: torch.Tensor
+    encoded_texts: torch.Tensor
+    image_lengths: torch.Tensor
+    text_lengths: torch.Tensor
 
 
 class DigitalPeterDataset(Dataset):
@@ -87,14 +107,15 @@ class DigitalPeterDataset(Dataset):
             self._is_sorted = True
         self._indices = list(range(len(self.keys)))
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> OcrDataItem:
         index = self._indices[index]
         img = self.images[index]
         if self.training:
             img = self.train_transforms(img)
         else:
             img = self.eval_transforms(img)
-        return img, self.texts[index], self.encoded_texts[index], len(self.texts[index]), self.keys[index]
+        return OcrDataItem(self.keys[index], img, self.texts[index], self.encoded_texts[index],
+                           self.encoded_texts[index].shape[-1])
 
     def __len__(self):
         return len(self.texts)
@@ -130,12 +151,14 @@ class DigitalPeterDataset(Dataset):
         random.shuffle(self._indices)
 
 
-def collate_fn(items):
-    items.sort(key=lambda item: -item[0].shape[-1])  # sort by image width
-    image_lengths = torch.LongTensor([item[0].shape[-1] for item in items])
-    images = utils_rnn.pad_sequence([item[0].transpose(0, -1) for item in items],
-                                    batch_first=False).permute(1, 3, 2, 0)  # CxHxW -> WxHxC -> WxBxHxC -> BxCxHxW
-    texts = [item[1] for item in items]
-    encoded_texts = utils_rnn.pad_sequence([item[2] for item in items], batch_first=True)
-    text_lengths = torch.LongTensor([item[2].shape[0] for item in items])
-    return images, texts, encoded_texts, image_lengths, text_lengths
+def collate_fn(items: List[OcrDataItem]):
+    items.sort(key=lambda item: -item.img.shape[-1])  # sort by image width
+    image_lengths = torch.LongTensor([item.img.shape[-1] for item in items])
+    images = utils_rnn.pad_sequence(
+        [item.img.transpose(0, -1) for item in items],
+        batch_first=False).permute(1, 3, 2, 0)  # CxHxW -> WxHxC -> WxBxHxC -> BxCxHxW
+    encoded_texts = utils_rnn.pad_sequence([item.encoded_text for item in items], batch_first=True)
+    texts = [item.text for item in items]
+    keys = [item.key for item in items]
+    text_lengths = torch.LongTensor([item.encoded_text_len for item in items])
+    return OcrDataBatch(keys, texts, images, encoded_texts, image_lengths, text_lengths)
