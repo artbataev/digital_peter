@@ -46,7 +46,7 @@ def get_chars(exclude_eng=False, min_char_freq=5) -> Set[str]:
 
 
 def get_exp_dir(args) -> Path:
-    model_str = f"{args.model}--{args.rnn_type}-{args.rnn_layers}_drop-{args.dropout}"
+    model_str = f"{args.model}--{args.rnn_type if args.model != 'transformerenc' else ''}-{args.rnn_layers}_drop-{args.dropout}"
     vocab_str = f"vocab--{'noeng_' if args.exclude_eng else ''}" \
                 f"min-freq-{args.min_char_freq}" \
                 f"{'_unk' if args.use_unk else ''}"
