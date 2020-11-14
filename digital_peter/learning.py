@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from typing import Dict
 
 import editdistance
@@ -60,13 +61,10 @@ class OcrLearner:
         self.model.eval()
         num_items = 0
         loss_accum = 0.0
-        total_chars = 0
-        error_chars = 0
-        total_words = 0
-        error_words = 0
 
         utt2log_logits: Dict[str, torch.Tensor] = dict()
         utt2hyp: Dict[str, str] = dict()
+        utt2ref: Dict[str, str] = dict()
         with torch.no_grad():
             ocr_data_batch: OcrDataBatch
             for batch_idx, ocr_data_batch in enumerate(tqdm(self.val_loader)):
@@ -80,7 +78,15 @@ class OcrLearner:
                 log_logits = F.log_softmax(logits, dim=-1)
                 loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths)
                 loss_accum += loss.sum().item()
-                num_items += len(batch_size)
+                num_items += batch_size
+
+                # save logits
+                cpu_log_logits = log_logits.transpose(0, 1).detach().cpu()
+                for i in range(batch_size):
+                    key = ocr_data_batch.keys[i]
+                    cur_logits = cpu_log_logits[i, :self.logits_len_fn(image_lengths[i])].detach()
+                    utt2log_logits[key] = cur_logits
+                    utt2ref[key] = ocr_data_batch.texts[i]
 
                 if greedy:
                     labels = logits.argmax(dim=-1).detach().cpu().numpy().transpose(1, 0)
@@ -90,25 +96,78 @@ class OcrLearner:
                         seq_lens=self.logits_len_fn(image_lengths))
 
                 for i, ref in enumerate(ocr_data_batch.texts):
-                    total_chars += len(ref)
                     key = ocr_data_batch.keys[i]
                     if greedy:
                         hyp_len = self.logits_len_fn(image_lengths[i].item())
-                        hyp = self.encoder.decode_ctc(labels[i].tolist()[:hyp_len])
-                        utt2hyp[key] = hyp
+                        hyp = self.encoder.decode_ctc(labels[i].tolist()[:hyp_len]).strip()
                     else:
                         hyp_len = out_lens[i][0]
                         hyp_encoded = beam_results[i, 0, :hyp_len]
-                        hyp = self.encoder.decode(hyp_encoded.numpy().tolist())
-                        utt2hyp[key] = hyp
-                    error_chars += editdistance.eval(hyp, ref)
-                    total_words += len(ref.split())
-                    error_words += editdistance.eval(hyp.split(), ref.split())
-                    if batch_idx == 0:
-                        self.log.info(f"ref: {ref}")
-                        self.log.info(f"hyp: {hyp}")
+                        hyp = self.encoder.decode(hyp_encoded.numpy().tolist()).strip()
+                    utt2hyp[key] = hyp
 
         loss_accum /= num_items
         self.log.info(f"loss: {loss_accum:.5f}")
-        self.log.info(f"CER: {error_chars / total_chars * 100:.2f}%, WER: {error_words / total_words * 100:.2f}%")
+        _ = self.calc_metrics(utt2hyp, utt2ref)
         return loss_accum
+
+        # not used now
+
+        # re-decode
+        utt2hyp_old = utt2hyp
+        utt2hyp = dict()
+
+        merged_keys = defaultdict(list)
+        for key in utt2ref:
+            key_base, line = key.rsplit("_", maxsplit=1)
+            merged_keys[key_base].append(int(line))
+
+        for mkey, lines in tqdm(merged_keys.items()):
+            keys = [f"{mkey}_{line}" for line in sorted(lines)]
+            log_logits = [utt2log_logits[key] for key in keys]
+            cum_logits_lengths = [l.shape[0] for l in log_logits]
+            for i in range(1, len(cum_logits_lengths)):
+                cum_logits_lengths[i] += cum_logits_lengths[i - 1]
+            stacked_logits = torch.cat(log_logits, 0).unsqueeze(0)
+            beam_results, beam_scores, timesteps, out_lens = self.parl_decoder.decode(
+                stacked_logits, seq_lens=torch.LongTensor([stacked_logits.shape[1]]))
+            l = out_lens[0][0]
+            result = beam_results[0][0][:l]
+            timesteps = timesteps[0][0][:l]
+            utterances = [[] for _ in range(len(keys))]
+            cur = 0
+            for i in range(l):
+                if timesteps[i] >= cum_logits_lengths[cur]:
+                    cur += 1
+                utterances[cur].append(result[i].item())
+            for key, raw_hyp in zip(keys, utterances):
+                utt2hyp[key] = self.encoder.decode(raw_hyp).strip()
+
+        _ = self.calc_metrics(utt2hyp, utt2ref)
+        for key in sorted(utt2hyp.keys()):
+            hyp = utt2hyp[key]
+            hyp_old = utt2hyp_old[key]
+            ref = utt2ref[key]
+            print(f"{key}: {hyp_old} -> {hyp} | {ref}")
+            print(f"{editdistance.eval(hyp_old, ref)} -> {editdistance.eval(hyp, ref)}")
+        return loss_accum
+
+    def calc_metrics(self, utt2hyp: Dict[str, str], utt2ref: Dict[str, str]):
+        error_chars = 0
+        total_chars = 0
+        error_words = 0
+        total_words = 0
+
+        for i, (key, hyp) in enumerate(utt2hyp.items()):
+            ref = utt2ref[key]
+            total_chars += len(ref)
+            total_words += len(ref.split())
+            error_chars += editdistance.eval(hyp, ref)
+            error_words += editdistance.eval(hyp.split(), ref.split())
+            if i < 20:
+                self.log.info(f"ref: {ref}")
+                self.log.info(f"hyp: {hyp}")
+        cer = error_chars / total_chars
+        wer = error_words / total_words
+        self.log.info(f"CER: {cer * 100:.2f}%, WER: {wer * 100:.2f}%")
+        return cer, wer
