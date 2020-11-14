@@ -131,7 +131,7 @@ def main():
         model = models.BaselineResnetIbm1(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
                                           n_rnn=args.rnn_layers)
     elif args.model == "transformerenc":
-        model = models.TransformerEncoderBase(num_outputs=num_outputs, dropout=args.dropout)
+        model = models.TransformerEncoderBase(num_outputs=num_outputs, dropout=args.dropout, n_layers=args.rnn_layers)
     else:
         raise Exception("unknown model")
     model = model.cuda()
