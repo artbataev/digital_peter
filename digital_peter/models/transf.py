@@ -28,7 +28,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerEncoderBase(nn.Module):
-    def __init__(self, num_outputs, dropout=0.1, n_layers=2, n_head=4, dim_feedforward=1024):
+    def __init__(self, num_outputs, dropout=0.1, n_layers=2, n_head=4, dim_feedforward=512):
         super().__init__()
         # input: Bx3x128xL
         left_context = 19
@@ -64,14 +64,17 @@ class TransformerEncoderBase(nn.Module):
             nn.ReLU(),
             LambdaModule(lambda x: x.squeeze(dim=2).permute(2, 0, 1)),  # LxBxC
         ])
+        self.reduce_dim = nn.Linear(512, 128)
 
-        self.pos_encoder = PositionalEncoding(512, dropout=dropout)
-        encoder_layers = nn.TransformerEncoderLayer(512, n_head, dim_feedforward=dim_feedforward, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_layers)
-        self.final = nn.Linear(512, num_outputs)
+        self.pos_encoder = PositionalEncoding(128, dropout=dropout)
+        encoder_layers = nn.TransformerEncoderLayer(128, n_head, dim_feedforward=dim_feedforward, dropout=dropout)
+        encoder_norm = nn.LayerNorm(128)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_layers, encoder_norm)
+        self.final = nn.Linear(128, num_outputs)
 
     def forward(self, images, image_lengths):
         output = self.encoder(images)  # LxBxC, L//4
+        output = self.reduce_dim(output)
         batch_size = images.shape[0]
         device = output.get_device()
         src_lengths = image_lengths // 4
