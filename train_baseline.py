@@ -67,7 +67,7 @@ def main():
     parser.add_argument("--optim", type=str, choices={"adam", "adabelief", "sgd"}, default="adam")
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
-    parser.add_argument("--model", default="base", choices={"base", "resnetibm1"})
+    parser.add_argument("--model", default="base", choices={"base", "resnetibm1", "transformerenc"})
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--exclude-eng", default=False, action="store_true")
     parser.add_argument("--min-char-freq", default=5, type=int)
@@ -130,6 +130,8 @@ def main():
     elif args.model == "resnetibm1":
         model = models.BaselineResnetIbm1(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
                                           n_rnn=args.rnn_layers)
+    elif args.model == "transformerenc":
+        model = models.TransformerEncoderBase(num_outputs=num_outputs, dropout=args.dropout)
     else:
         raise Exception("unknown model")
     model = model.cuda()
