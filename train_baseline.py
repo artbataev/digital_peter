@@ -3,9 +3,7 @@ import logging
 import math
 import pickle
 import random
-from collections import Counter
 from pathlib import Path
-from typing import Set
 
 import numpy as np
 import torch
@@ -18,7 +16,7 @@ from digital_peter import models
 from digital_peter.data import DigitalPeterDataset, collate_fn
 from digital_peter.learning import OcrLearner
 from digital_peter.logging_utils import setup_logger
-from digital_peter.text import TextEncoder
+from digital_peter.text import TextEncoder, get_chars
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -30,23 +28,8 @@ def set_seed():
     np.random.seed(111)
 
 
-def get_chars(exclude_eng=False, min_char_freq=5) -> Set[str]:
-    english = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w'}
-    # with open(DATA_DIR / "chars_set.pkl", "rb") as f:
-    #     all_chars = pickle.load(f)
-    with open(DATA_DIR / "chars_counter.pkl", "rb") as f:
-        chars_counter: Counter = pickle.load(f)
-    chars = set()
-    for char, cnt in chars_counter.items():
-        if cnt >= min_char_freq:
-            chars.add(char)
-    if exclude_eng:
-        chars -= english
-    return chars
-
-
 def get_exp_dir(args) -> Path:
-    model_str = f"{args.model}--{args.rnn_type if args.model != 'transformerenc' else ''}-{args.rnn_layers}_drop-{args.dropout}"
+    model_str = f"{args.model}"
     vocab_str = f"vocab--{'noeng_' if args.exclude_eng else ''}" \
                 f"min-freq-{args.min_char_freq}" \
                 f"{'_unk' if args.use_unk else ''}"
@@ -67,13 +50,11 @@ def main():
     parser.add_argument("--optim", type=str, choices={"adam", "adabelief", "sgd"}, default="adam")
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
-    parser.add_argument("--model", default="base", choices={"base", "resnetibm1", "transformerenc"})
+    parser.add_argument("--model", default="base", type=str, help="model name, from models module")
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--exclude-eng", default=False, action="store_true")
     parser.add_argument("--min-char-freq", default=5, type=int)
     parser.add_argument("--use-unk", default=False, action="store_true")
-    parser.add_argument("--rnn-layers", type=int, default=2)
-    parser.add_argument("--rnn-type", type=str, default="GRU", choices={"GRU", "LSTM"})
     parser.add_argument("--from-ckp", type=str, default="")
     parser.add_argument("--exp-dir", type=str, default="exp")
     parser.add_argument("--force", default=False, action="store_true", help="ingore existing dir")
@@ -86,7 +67,7 @@ def main():
     log = logging.getLogger("trainscript")
     log.info(f"args: {args}")
 
-    chars = get_chars(args.exclude_eng, args.min_char_freq)
+    chars = get_chars(DATA_DIR / "chars_counter.pkl", args.exclude_eng, args.min_char_freq)
     encoder = TextEncoder(chars, use_unk=args.use_unk)
 
     with open(DATA_DIR / "train_uttids_set.pkl", "rb") as f:
@@ -123,17 +104,7 @@ def main():
     final_lr = args.final_lr
     num_epochs = args.epochs
 
-    if args.model == "base":
-        model = models.BaselineModelBnAllNoTimePad(num_outputs=num_outputs, dropout=args.dropout,
-                                                   rnn_type=args.rnn_type,
-                                                   n_rnn=args.rnn_layers)
-    elif args.model == "resnetibm1":
-        model = models.BaselineResnetIbm1(num_outputs=num_outputs, dropout=args.dropout, rnn_type=args.rnn_type,
-                                          n_rnn=args.rnn_layers)
-    elif args.model == "transformerenc":
-        model = models.TransformerEncoderBase(num_outputs=num_outputs, dropout=args.dropout, n_layers=args.rnn_layers)
-    else:
-        raise Exception("unknown model")
+    model: nn.Module = getattr(models, args.model)(num_outputs=num_outputs)
     model = model.cuda()
     if args.from_ckp:
         model.load_state_dict(torch.load(args.from_ckp, map_location="cuda"))
