@@ -119,9 +119,7 @@ def main():
         optimizer = optim.SGD(model.parameters(), lr=init_lr, momentum=args.momentum, weight_decay=args.wd)
     else:
         raise Exception("unknown optimizer")
-    learner = OcrLearner(model, optimizer, criterion, train_loader, val_loader, encoder,
-                         logits_len_fn=lambda x: x // 4,
-                         parl_decoder=parl_decoder)
+    learner = OcrLearner(model, optimizer, criterion, train_loader, val_loader, encoder, parl_decoder=parl_decoder)
 
     reduce_lr = optim.lr_scheduler.LambdaLR(optimizer,
                                             lambda epoch: math.exp(math.log(final_lr / init_lr) * epoch / num_epochs))

@@ -83,4 +83,4 @@ class TransformerEncoderBase(nn.Module):
         # padding_mask = padding_mask.transpose(0, 1)
         output = self.transformer_encoder(output, src_key_padding_mask=padding_mask)
         logits = self.final(output)
-        return logits  # LxBxC
+        return logits, src_lengths  # LxBxC

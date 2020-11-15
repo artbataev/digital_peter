@@ -47,7 +47,7 @@ class BaselineModel(nn.Module):
         output = self.rnn(output)[0]
         output = utils_rnn.pad_packed_sequence(output)[0]
         logits = self.final(output)
-        return logits  # LxBxC
+        return logits, image_lengths // 4 - 1  # LxBxC, B
 
 
 class BaselineModelBnFirst(BaselineModel):
@@ -107,7 +107,7 @@ class BaselineModelBnAll(nn.Module):
         output = self.rnn(output)[0]
         output = utils_rnn.pad_packed_sequence(output)[0]
         logits = self.final(output)
-        return logits  # LxBxC
+        return logits, image_lengths // 4 - 1  # LxBxC, B
 
 
 class BaselineModelBnAllNoTimePad(nn.Module):
@@ -167,7 +167,7 @@ class BaselineModelBnAllNoTimePad(nn.Module):
             output = self.rnn(output)[0]
             output = utils_rnn.pad_packed_sequence(output)[0]
         logits = self.final(output)
-        return logits  # LxBxC
+        return logits, image_lengths // 4  # LxBxC, B
 
 
 class BaselineModelResNet1(nn.Module):
@@ -211,4 +211,4 @@ class BaselineModelResNet1(nn.Module):
             output = self.rnn(output)[0]
             output = utils_rnn.pad_packed_sequence(output)[0]
         logits = self.final(output)
-        return logits  # LxBxC
+        return logits, image_lengths // 4  # LxBxC, B

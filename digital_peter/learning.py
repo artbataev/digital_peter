@@ -17,7 +17,6 @@ class OcrLearner:
                  train_loader,
                  val_loader,
                  encoder,
-                 logits_len_fn=lambda x: x // 4 - 1,
                  parl_decoder=None):
         self.model = model
         self.optimizer = optimizer
@@ -26,7 +25,6 @@ class OcrLearner:
         self.val_loader = val_loader
         self.encoder = encoder
         self.parl_decoder = parl_decoder
-        self.logits_len_fn = logits_len_fn
         self.log = logging.getLogger(__name__)
 
     def train_model(self):
@@ -41,9 +39,9 @@ class OcrLearner:
             text_lengths = ocr_data_batch.text_lengths.cuda().to(torch.int32)  # for ctc
 
             self.optimizer.zero_grad()
-            logits = self.model(images, image_lengths)
+            logits, logits_lengths = self.model(images, image_lengths)
             log_logits = F.log_softmax(logits, dim=-1)
-            loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths).mean()
+            loss = self.criterion(log_logits, encoded_texts, logits_lengths, text_lengths).mean()
             loss.backward()
             self.optimizer.step()
 
@@ -74,9 +72,9 @@ class OcrLearner:
                 text_lengths = ocr_data_batch.text_lengths.cuda().to(torch.int32)  # for ctc
                 batch_size = images.shape[0]
 
-                logits = self.model(images, image_lengths)
+                logits, logits_lengths = self.model(images, image_lengths)
                 log_logits = F.log_softmax(logits, dim=-1)
-                loss = self.criterion(log_logits, encoded_texts, self.logits_len_fn(image_lengths), text_lengths)
+                loss = self.criterion(log_logits, encoded_texts, logits_lengths, text_lengths)
                 loss_accum += loss.sum().item()
                 num_items += batch_size
 
@@ -84,7 +82,7 @@ class OcrLearner:
                 cpu_log_logits = log_logits.transpose(0, 1).detach().cpu()
                 for i in range(batch_size):
                     key = ocr_data_batch.keys[i]
-                    cur_logits = cpu_log_logits[i, :self.logits_len_fn(image_lengths[i])].detach()
+                    cur_logits = cpu_log_logits[i, :logits_lengths[i]].detach()
                     utt2log_logits[key] = cur_logits
                     utt2ref[key] = ocr_data_batch.texts[i]
 
@@ -93,12 +91,12 @@ class OcrLearner:
                 else:
                     beam_results, beam_scores, timesteps, out_lens = self.parl_decoder.decode(
                         log_logits.transpose(0, 1).detach(),
-                        seq_lens=self.logits_len_fn(image_lengths))
+                        seq_lens=logits_lengths)
 
                 for i, ref in enumerate(ocr_data_batch.texts):
                     key = ocr_data_batch.keys[i]
                     if greedy:
-                        hyp_len = self.logits_len_fn(image_lengths[i].item())
+                        hyp_len = logits_lengths[i].item()
                         hyp = self.encoder.decode_ctc(labels[i].tolist()[:hyp_len]).strip()
                     else:
                         hyp_len = out_lens[i][0]
