@@ -12,6 +12,13 @@ class LambdaModule(nn.Module):
         return self.f(*args)
 
 
+class SequentialSequential(nn.Sequential):
+    def forward(self, *inputs):
+        for module in self:
+            inputs = module(*inputs)
+        return inputs
+
+
 class SequentialLinear(nn.Module):
     def __init__(self, num_inputs, num_outputs, pre_activation=True):
         super().__init__()

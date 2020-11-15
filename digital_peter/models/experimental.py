@@ -2,8 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from digital_peter.models.base import BaselineModelBnAllNoTimePad
-from digital_peter.models.blocks import LambdaModule
-from digital_peter.models.blocks import SequentialLinear
+from digital_peter.models.blocks import LambdaModule, SequentialLinear, SequentialSequential
 from digital_peter.models.conv import ConvExtractor, ResnetExtractor
 from digital_peter.models.rnn import RNNEncoder
 
@@ -31,7 +30,7 @@ def base__drop02__lstm_4x128(num_outputs) -> nn.Module:
 
 # basic model modularized
 def conv__gru_2x256_drop02(num_outputs) -> nn.Module:
-    model = nn.Sequential(*[
+    model = SequentialSequential(*[
         ConvExtractor(),
         LambdaModule(lambda seq, seq_len: (F.relu(seq), seq_len)),
         RNNEncoder(dropout=0.2, rnn_type="GRU", num_layers=2, hidden_size=256, input_size=512),
@@ -41,7 +40,7 @@ def conv__gru_2x256_drop02(num_outputs) -> nn.Module:
 
 
 def resnet__gru_2x256_drop02(num_outputs) -> nn.Module:
-    model = nn.Sequential(*[
+    model = SequentialSequential(*[
         ResnetExtractor(),
         LambdaModule(lambda seq, seq_len: (F.relu(seq), seq_len)),
         RNNEncoder(dropout=0.2, rnn_type="GRU", num_layers=2, hidden_size=256, input_size=512),
