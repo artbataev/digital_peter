@@ -157,7 +157,7 @@ class BaselineModelBnAllNoTimePad(nn.Module):
                                 num_layers=n_rnn)
         else:
             self.rnn = nn.Identity()
-        self.final = nn.Linear(512, num_outputs)
+        self.final = nn.Linear(rnn_dim * 2, num_outputs)
 
     def forward(self, images, image_lengths):
         output = self.encoder(images)  # LxBxC, L//4
