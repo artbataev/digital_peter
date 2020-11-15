@@ -5,7 +5,7 @@ from digital_peter.models.resnets import ResBlock
 
 
 class ConvExtractor(nn.Module):
-    def __init__(self):
+    def __init__(self, norm=nn.BatchNorm2d):
         super().__init__()
         # input: Bx3x128xL
         left_context = 19
@@ -13,29 +13,29 @@ class ConvExtractor(nn.Module):
         self.reduction_fn = lambda x: x // 4
         self.encoder = nn.Sequential(*[
             nn.ReplicationPad2d([left_context, right_context, 0, 0]),
-            nn.BatchNorm2d(3),
+            norm(3),
             nn.Conv2d(3, 64, kernel_size=(3, 3), padding=[1, 0]),  # L - 2
             nn.ReLU(),
-            nn.BatchNorm2d(64),
+            norm(64),
             nn.MaxPool2d(kernel_size=(4, 2), stride=2),  # / 2
             nn.Conv2d(64, 128, kernel_size=(3, 3), padding=[1, 0]),  # -2
             nn.ReLU(),
-            nn.BatchNorm2d(128),
+            norm(128),
             nn.MaxPool2d(kernel_size=(4, 2), stride=2),  # /2
             nn.Conv2d(128, 256, (3, 3), padding=[1, 0]),  # -2
             nn.ReLU(),
-            nn.BatchNorm2d(256),
+            norm(256),
             nn.Conv2d(256, 256, (3, 3), padding=[1, 0]),  # -2
             nn.ReLU(),
-            nn.BatchNorm2d(256),
+            norm(256),
             nn.ZeroPad2d([0, 0, 2, 1]),  # same padding for maxpool2d
             nn.MaxPool2d(kernel_size=(4, 1), padding=0),  # pool_4
             nn.Conv2d(256, 512, (3, 3), padding=[1, 0]),  # -2
             nn.ReLU(),
-            nn.BatchNorm2d(512),
+            norm(512),
             nn.Conv2d(512, 512, (3, 3), padding=[1, 0]),  # -2
             nn.ReLU(),
-            nn.BatchNorm2d(512),
+            norm(512),
             nn.ZeroPad2d([0, 0, 1, 2]),  # same padding for maxpool2d
             nn.MaxPool2d(kernel_size=(4, 1), padding=0),
             nn.Conv2d(512, 512, (2, 2)),  # 512x1x255 CxHxW # -1
