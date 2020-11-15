@@ -6,13 +6,13 @@ from digital_peter.models.transf import PositionalEncoding
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, dropout=0.2, num_layers=2, rnn_type="GRU", hidden_size=256):
+    def __init__(self, dropout=0.2, num_layers=2, rnn_type="GRU", hidden_size=256, input_size=512):
         super().__init__()
         self.rnn_dropout = nn.Dropout(dropout)
         rnn_type = getattr(nn, rnn_type)
         self.num_layers = num_layers
         assert num_layers >= 1
-        self.rnn = rnn_type(input_size=512, hidden_size=hidden_size, bidirectional=True, dropout=dropout,
+        self.rnn = rnn_type(input_size=input_size, hidden_size=hidden_size, bidirectional=True, dropout=dropout,
                             batch_first=False,
                             num_layers=num_layers)
 
