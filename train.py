@@ -71,7 +71,7 @@ def main():
     with open(DATA_DIR / "val_uttids_set.pkl", "rb") as f:
         val_uttids = pickle.load(f)
     train_data = DigitalPeterDataset(DATA_DIR / "train", train_uttids, encoder, image_len_divisible_by=4,
-                                     verbose=False, training=True)
+                                     verbose=True, training=True)
     val_data = DigitalPeterDataset(DATA_DIR / "train", val_uttids, encoder, image_len_divisible_by=4,
                                    verbose=False, training=False)
     log.info(f"data: {len(train_data), len(val_data)}")

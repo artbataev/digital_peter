@@ -43,9 +43,10 @@ def get_chars(counter_pkl_path, exclude_eng=False, min_char_freq=5) -> Set[str]:
 
 
 def get_chars_from_file(filename) -> Set[str]:
-    chars = set()
+    chars = {" "}
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
-            if line:
-                chars.add(line)
+            char = line.strip()
+            if char:
+                chars.add(char)
     return chars
