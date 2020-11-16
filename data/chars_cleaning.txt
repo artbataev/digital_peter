@@ -1,0 +1,81 @@
+ 	26554
+о	16181
+а	10994
+е	10376
+т	10179
+н	8318
+и	7244
+с	6244
+р	6142
+л	5848
+в	5581
+д	5275
+к	4944
+м	4883
+п	4766
+у	4148
+б	3061
+i	2909
+ѣ	2567
+я	2517
+ы	2320
+ч	2316
+г	2257
+з	2182
+ъ	2012
+ж	1856
+х	1296
+ш	1264
+й	1235
+ю	1222
+ф	752
+ц	717
+1	330
+ь	312
++	244
+щ	191
+[	176
+0	169
+]	166
+2	146
+7	115
+3	98
+4	63
+5	59
+э	51
+8	40
+r	36
+e	36
+p	35
+s	30
+9	27
+6	26
+t	20
+f	15
+і	13 # replace with i
+h	10
+n	9
+c	9 # useless, replace with russian с
+m	7
+⊕	7
+d	5
+a	5 # replace with а
+⊗	5 # replace with ⊕
+g	4
+b	3
+l	3 # ? useless, only lll
+–	3 # useless, replace with space
+)	3 # remove
+o	2 # only monseneur(?), remove 20_16_0 + 41_10_1
+|	2 # useless, remove
+×	2 # to +
+k	1 # replace with к
+u	1 # only monseneur, remove
+ǂ	1 # to +
+…	1 # remove 47_20_5 or crop
+/	1 # remove 313_12_9
+
+# 20_16_0
+# 41_10_1
+# 47_20_5
+# 313_12_9

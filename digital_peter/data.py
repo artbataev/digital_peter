@@ -36,12 +36,48 @@ class OcrDataBatch:
     text_lengths: torch.Tensor
 
 
+def clean_text(text: str) -> str:
+    # remove
+    replacements = [
+        ("і", "i"),
+        ("c", "с"),
+        ("a", "а"),
+        ("⊗", "⊕"),
+        ("lll", " "),
+        ("–", " "),
+        (")", " "),
+        ("|", " "),
+        ("×", "+"),
+        ("k", "к"),
+        ("ǂ", "+"),
+    ]
+    text = text.strip()
+    for char_in, char_out in replacements:
+        text = text.replace(char_in, char_out)
+    text = " ".join(text.strip().split())  # remove additional spaces
+    return text
+
+
+def clean_text_file(file_in, file_out):
+    keys_to_remove = {"20_16_0", "41_10_1", "47_20_5", "313_12_9"}
+    with open(file_in, "r", encoding="utf-8") as f_in, open(file_out, "w", encoding="utf-8") as f_out:
+        for line in f_in:
+            try:
+                uttid, text = line.strip().split(maxsplit=1)
+            except ValueError:
+                continue
+            if uttid in keys_to_remove:
+                continue
+            text = clean_text(text)
+            print(f"{uttid} {text}", file=f_out)
+
+
 class DigitalPeterDataset(Dataset):
     def __init__(self,
                  base_dir: Union[Path, str],
                  uttids: Set[str],
                  encoder: TextEncoder,
-                 image_len_divisible_by=1,
+                 image_len_divisible_by=4,
                  training=False,
                  verbose=True,
                  sort=False):
