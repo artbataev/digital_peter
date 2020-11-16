@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--init-lr", type=float, default=1e-3)
     parser.add_argument("--final-lr", type=float, default=1e-5)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=24)
     parser.add_argument("--start-ep", type=int, default=0)
     parser.add_argument("--bs", type=int, default=10, help="batch size")
     parser.add_argument("--optim", type=str, choices={"adam", "adabelief", "sgd"}, default="adam")
