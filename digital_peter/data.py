@@ -113,12 +113,14 @@ class DigitalPeterDataset(Dataset):
         self.image_len_divisible_by = image_len_divisible_by
         log = logging.getLogger(__name__)
 
+        keys_to_remove = {"20_16_0", "41_10_1", "47_20_5", "313_12_9"}  # FixMe: move
         for uttid in tqdm(sorted(uttids)):
+            if uttid in keys_to_remove:
+                continue
             imagepath = self.image_dir / f"{uttid}.jpg"
             textpath = self.trans_dir / f"{uttid}.txt"
             with open(textpath, "r", encoding="utf-8") as f:
-                text = f.read().strip()
-                text = " ".join(text.split())  # remove duplicated spaces
+                text = clean_text(f.read().strip())
             try:
                 encoded_text = self.encoder.encode(text)
             except KeyError:
