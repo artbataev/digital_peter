@@ -16,7 +16,7 @@ from digital_peter import models
 from digital_peter.data import DigitalPeterDataset, collate_fn
 from digital_peter.learning import OcrLearner
 from digital_peter.logging_utils import setup_logger
-from digital_peter.text import TextEncoder, get_chars
+from digital_peter.text import TextEncoder, get_chars_from_file
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -28,14 +28,11 @@ def set_seed():
     np.random.seed(111)
 
 
-def get_exp_dir(args) -> Path:
-    model_str = f"{args.model}"
-    vocab_str = f"vocab--{'noeng_' if args.exclude_eng else ''}" \
-                f"min-freq-{args.min_char_freq}" \
-                f"{'_unk' if args.use_unk else ''}"
+def get_exp_dir(args, num_chars: int) -> Path:
+    model_str = f"{args.model}--{num_chars}"
     opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.init_lr}to{args.final_lr}_bs-{args.bs}" \
               f"_optim-{args.optim}-wd{args.wd}"
-    exp_dir = f"{model_str}/{vocab_str}/{opt_str}"
+    exp_dir = f"{model_str}/{opt_str}"
     exp_dir = Path(args.exp_dir) / exp_dir
     return exp_dir
 
@@ -52,23 +49,22 @@ def main():
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
     parser.add_argument("--model", default="base", type=str, help="model name, from models module")
     parser.add_argument("--dropout", type=float, default=0.2)
-    parser.add_argument("--exclude-eng", default=False, action="store_true")
-    parser.add_argument("--min-char-freq", default=5, type=int)
-    parser.add_argument("--use-unk", default=False, action="store_true")
     parser.add_argument("--from-ckp", type=str, default="")
     parser.add_argument("--exp-dir", type=str, default="exp")
     parser.add_argument("--force", default=False, action="store_true", help="ingore existing dir")
     args = parser.parse_args()
 
     set_seed()
-    exp_dir = get_exp_dir(args)
+    chars = get_chars_from_file(DATA_DIR / "chars_new.txt")
+
+    exp_dir = get_exp_dir(args, len(chars))
     exp_dir.mkdir(exist_ok=args.force, parents=True)
     setup_logger(exp_dir)
     log = logging.getLogger("trainscript")
     log.info(f"args: {args}")
 
-    chars = get_chars(DATA_DIR / "chars_counter.pkl", args.exclude_eng, args.min_char_freq)
-    encoder = TextEncoder(chars, use_unk=args.use_unk)
+    encoder = TextEncoder(chars)
+    assert len(chars) == 62
 
     with open(DATA_DIR / "train_uttids_set.pkl", "rb") as f:
         train_uttids = pickle.load(f)

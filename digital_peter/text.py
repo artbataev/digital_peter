@@ -3,6 +3,7 @@ from typing import Set, List
 import pickle
 from collections import Counter
 
+
 class TextEncoder:
     def __init__(self, allowed_chars: Set[str], use_unk=False):
         self.allowed_chars = allowed_chars
@@ -27,6 +28,7 @@ class TextEncoder:
     def decode_ctc(self, sequence: List[int]):
         return self.decode([i for i, _ in itertools.groupby(sequence) if i != 0])
 
+
 def get_chars(counter_pkl_path, exclude_eng=False, min_char_freq=5) -> Set[str]:
     english = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w'}
     with open(counter_pkl_path, "rb") as f:
@@ -37,4 +39,13 @@ def get_chars(counter_pkl_path, exclude_eng=False, min_char_freq=5) -> Set[str]:
             chars.add(char)
     if exclude_eng:
         chars -= english
+    return chars
+
+
+def get_chars_from_file(filename) -> Set[str]:
+    chars = set()
+    with open(filename, "r", encoding="utf-8") as f:
+        for line in f:
+            if line:
+                chars.add(line)
     return chars
