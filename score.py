@@ -10,7 +10,11 @@ def read_utt2text(filename) -> Dict[str, str]:
         for line in f:
             if not line.strip():
                 continue
-            uttid, text = line.strip().split(maxsplit=1)
+            try:
+                uttid, text = line.strip().split(maxsplit=1)
+            except ValueError:
+                uttid = line.strip()
+                text = ""
             utt2text[uttid] = " ".join(text.split())
 
     return utt2text
