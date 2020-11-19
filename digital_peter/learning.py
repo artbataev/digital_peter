@@ -52,6 +52,27 @@ class OcrLearner:
                 tmp_loss_num = 0
                 tmp_loss = 0.0
 
+    def get_val_logits(self):
+        self.model.eval()
+        utt2log_logits: Dict[str, torch.Tensor] = dict()
+        with torch.no_grad():
+            ocr_data_batch: OcrDataBatch
+            for batch_idx, ocr_data_batch in enumerate(tqdm(self.val_loader)):
+                images = ocr_data_batch.images.cuda()
+                image_lengths = ocr_data_batch.image_lengths.cuda()
+                batch_size = images.shape[0]
+
+                logits, logits_lengths = self.model(images, image_lengths)
+                log_logits = F.log_softmax(logits, dim=-1)
+
+                # save logits
+                cpu_log_logits = log_logits.transpose(0, 1).detach().cpu()
+                for i in range(batch_size):
+                    key = ocr_data_batch.keys[i]
+                    cur_logits = cpu_log_logits[i, :logits_lengths[i]].detach()
+                    utt2log_logits[key] = cur_logits
+        return utt2log_logits
+
     def val_model(self, greedy=True):
         if not greedy and self.parl_decoder is None:
             raise Exception("no decoder")

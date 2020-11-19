@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from ctcdecode import CTCBeamDecoder
 from torch.utils.data import DataLoader
+import kaldi_io
 
 from digital_peter import models
 from digital_peter.data import DigitalPeterDataset, collate_fn
@@ -65,8 +66,13 @@ def main():
 
     learner = OcrLearner(model, None, criterion, None, val_loader, encoder, parl_decoder=parl_decoder)
 
-    learner.val_model()
-    learner.val_model(greedy=False)
+    # learner.val_model()
+    # learner.val_model(greedy=False)
+    utt2logits = learner.get_val_logits()
+    with open("logits.ark", "wb") as f:
+        for key, torch_logits in utt2logits.items():
+            np_logits = torch_logits.numpy()
+            kaldi_io.write_mat(f, np_logits, key=key)
 
 
 if __name__ == "__main__":

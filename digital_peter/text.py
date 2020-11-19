@@ -1,7 +1,9 @@
 import itertools
-from typing import Set, List
+from typing import Set, List, Dict
 import pickle
 from collections import Counter
+import editdistance
+import logging
 
 
 class TextEncoder:
@@ -50,3 +52,25 @@ def get_chars_from_file(filename) -> Set[str]:
             if char:
                 chars.add(char)
     return chars
+
+
+def calc_metrics(utt2hyp: Dict[str, str], utt2ref: Dict[str, str]):
+    error_chars = 0
+    total_chars = 0
+    error_words = 0
+    total_words = 0
+    log = logging.getLogger(__name__)
+
+    for i, (uttid, hyp) in enumerate(utt2hyp.items()):
+        ref = utt2ref[uttid]
+        total_chars += len(ref)
+        total_words += len(ref.split())
+        error_chars += editdistance.eval(hyp, ref)
+        error_words += editdistance.eval(hyp.split(), ref.split())
+        if i < 20:
+            log.info(f"{uttid} ref: {ref}")
+            log.info(f"{uttid} hyp: {hyp}")
+    cer = error_chars / total_chars
+    wer = error_words / total_words
+    log.info(f"CER: {cer * 100:.2f}%, WER: {wer * 100:.2f}%")
+    return cer, wer
