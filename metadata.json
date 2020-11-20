@@ -1,4 +1,4 @@
 {
-  "image": "artbataev/dpeter:0.0.1",
+  "image": "artbataev/dpeter:0.0.2",
   "entry_point": "python evaluate.py --eval-mode --model=conv__gru_2x256_drop02 --from-ckp=submit_data_1/model_conv_gru_2x256_alb.pt --lm=submit_data_1/mixed_0.7.arpa --lmwt=0.9 --wip=2.0"
 }
