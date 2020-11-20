@@ -5,4 +5,5 @@ RUN apt-get update && apt-get install -y git build-essential g++ make python3.7-
 RUN pip install albumentations editdistance tqdm
 RUN pip install git+https://github.com/parlance/ctcdecode.git
 
-USER webapp # original from odsai/python-gpu
+# original user from odsai/python-gpu
+USER webapp
