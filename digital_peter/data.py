@@ -165,7 +165,7 @@ class DigitalPeterDataset(Dataset):
                            self.encoded_texts[index].shape[-1])
 
     def __len__(self):
-        return len(self.texts)
+        return len(self.keys)
 
     def sort_by_len(self):
         indices = list(range(len(self.images)))
@@ -196,6 +196,50 @@ class DigitalPeterDataset(Dataset):
 
     def shuffle(self):
         random.shuffle(self._indices)
+
+
+class DigitalPeterEvalDataset(Dataset):
+    def __init__(self,
+                 image_dir: Union[Path, str],
+                 img_height=128,
+                 image_len_divisible_by=4):
+        super().__init__()
+
+        self.image_dir = Path(image_dir)
+        self.images = []
+        self.texts = []
+        self.encoded_texts = []
+        self.keys = []
+        self.img_height = img_height
+
+        self.transforms = transforms.ToTensor()
+        self.image_len_divisible_by = image_len_divisible_by
+        log = logging.getLogger(__name__)
+
+        for imagepath in tqdm(self.image_dir.glob("*.jpg")):
+            uttid = imagepath.stem
+
+            self.keys.append(uttid)
+            self.texts.append("")
+            self.encoded_texts.append(torch.LongTensor([]))
+            img = cv2.imread(f"{imagepath}")
+            img = process_image(img, self.img_height)
+            width = img.shape[1]
+            if width % image_len_divisible_by != 0:
+                right_add = np.full([img.shape[0], image_len_divisible_by - width % image_len_divisible_by, 3], 255,
+                                    dtype=img.dtype)
+                img = np.concatenate((img, right_add), axis=1)
+
+            self.images.append(img)  # HxWxC -> CxHxW later
+
+    def __getitem__(self, index: int) -> OcrDataItem:
+        img = self.images[index]
+        img = self.transforms(img)
+        return OcrDataItem(self.keys[index], img, self.texts[index], self.encoded_texts[index],
+                           self.encoded_texts[index].shape[-1])
+
+    def __len__(self):
+        return len(self.keys)
 
 
 def collate_fn(items: List[OcrDataItem]):
