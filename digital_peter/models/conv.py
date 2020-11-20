@@ -102,20 +102,21 @@ class ConvExtractorDeeper(nn.Module):
 class ConvExtractorHiRes(nn.Module):
     def __init__(self):
         super().__init__()
-        # input: Bx3x128xL
-        left_context = 30
-        right_context = 30
-        self.reduction_fn = lambda x: x // 4
+        # input: Bx3x256xL
+        left_context = 60
+        right_context = 60
+        self.reduction_fn = lambda x: x // 8
         self.encoder = nn.Sequential(*[
             nn.ReplicationPad2d([left_context, right_context, 0, 0]),
             nn.BatchNorm2d(3),
-            nn.Conv2d(3, 64, kernel_size=(3, 3), padding=[1, 0]),  # - 2
-            nn.ReLU(),
-            nn.BatchNorm2d(64),
-            nn.Conv2d(64, 64, kernel_size=(3, 3), padding=[1, 0]),  # -2
+            nn.Conv2d(3, 64, kernel_size=(5, 5), padding=[2, 0]),  # - 4
             nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),  # / H/2, L/2
+            nn.Conv2d(64, 64, kernel_size=(3, 3), padding=[1, 0]),  # -2
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=(1, 2)),  # L/2
             nn.Conv2d(64, 128, kernel_size=(3, 3), padding=[1, 0]),  # L-2
             nn.ReLU(),
             nn.BatchNorm2d(128),
