@@ -102,7 +102,7 @@ def main():
                                             img_height=args.img_height, image_len_divisible_by=4)
         eval_loader = DataLoader(test_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
         utt2hyp = get_utt2hyp(model, eval_loader, parl_decoder, encoder)
-        write_utt2hyp(utt2hyp, Path(args.test_hyp_dir))
+        write_utt2hyp(utt2hyp, Path(args.test_hyps_dir))
     else:
         with open(DATA_DIR / "val_uttids_set.pkl", "rb") as f:
             val_uttids = pickle.load(f)
