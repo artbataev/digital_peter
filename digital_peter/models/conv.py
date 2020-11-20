@@ -47,6 +47,111 @@ class ConvExtractor(nn.Module):
         return output, self.reduction_fn(image_lengths)  # LxBxC, B
 
 
+class ConvExtractorDeeper(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # input: Bx3x128xL
+        left_context = 30
+        right_context = 30
+        self.reduction_fn = lambda x: x // 4
+        self.encoder = nn.Sequential(*[
+            nn.ReplicationPad2d([left_context, right_context, 0, 0]),
+            nn.BatchNorm2d(3),
+            nn.Conv2d(3, 64, kernel_size=(3, 3), padding=[1, 0]),  # - 2
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, kernel_size=(3, 3), padding=[1, 0]),  # -2
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=2),  # / H/2, L/2
+            nn.Conv2d(64, 128, kernel_size=(3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=2),  # H/2, L/2
+            nn.Conv2d(128, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=(2, 1)),  # H/2
+            nn.Conv2d(256, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=(2, 1), padding=0),  # H/2
+            nn.Conv2d(256, 512, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(kernel_size=(2, 1)),  # H/2
+            nn.Conv2d(512, 512, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(kernel_size=(2, 1), padding=0),  # H/2
+            nn.Conv2d(512, 512, (2, 3)),  # 512x1x255 CxHxW # L-2
+            LambdaModule(lambda x: x.squeeze(dim=2).permute(2, 0, 1)),  # LxBxC
+        ])
+
+    def forward(self, images, image_lengths):
+        output = self.encoder(images)  # LxBxC, L//4
+        return output, self.reduction_fn(image_lengths)  # LxBxC, B
+
+
+class ConvExtractorHiRes(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # input: Bx3x128xL
+        left_context = 30
+        right_context = 30
+        self.reduction_fn = lambda x: x // 4
+        self.encoder = nn.Sequential(*[
+            nn.ReplicationPad2d([left_context, right_context, 0, 0]),
+            nn.BatchNorm2d(3),
+            nn.Conv2d(3, 64, kernel_size=(3, 3), padding=[1, 0]),  # - 2
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, kernel_size=(3, 3), padding=[1, 0]),  # -2
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=2),  # / H/2, L/2
+            nn.Conv2d(64, 128, kernel_size=(3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=2),  # H/2, L/2
+            nn.Conv2d(128, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=(2, 1)),  # H/2 - additional max pool
+            nn.Conv2d(256, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=(2, 1)),  # H/2
+            nn.Conv2d(256, 256, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=(2, 1), padding=0),  # H/2
+            nn.Conv2d(256, 512, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(kernel_size=(2, 1)),  # H/2
+            nn.Conv2d(512, 512, (3, 3), padding=[1, 0]),  # L-2
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(kernel_size=(2, 1), padding=0),  # H/2
+            nn.Conv2d(512, 512, (2, 3)),  # 512x1x255 CxHxW # L-2
+            LambdaModule(lambda x: x.squeeze(dim=2).permute(2, 0, 1)),  # LxBxC
+        ])
+
+    def forward(self, images, image_lengths):
+        output = self.encoder(images)  # LxBxC, L//4
+        return output, self.reduction_fn(image_lengths)  # LxBxC, B
+
+
 class ResnetExtractor(nn.Module):
     """
     See https://arxiv.org/abs/1703.02136

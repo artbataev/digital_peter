@@ -70,12 +70,13 @@ def main():
         train_uttids = pickle.load(f)
     with open(DATA_DIR / "val_uttids_set.pkl", "rb") as f:
         val_uttids = pickle.load(f)
+    image_len_divisible_by = 8 if args.img_height == 256 else 4
     train_data = DigitalPeterDataset(DATA_DIR / "train", train_uttids,
                                      encoder,
-                                     img_height=args.img_height, image_len_divisible_by=4,
+                                     img_height=args.img_height, image_len_divisible_by=image_len_divisible_by,
                                      verbose=True, training=True)
     val_data = DigitalPeterDataset(DATA_DIR / "train", val_uttids, encoder,
-                                   img_height=args.img_height, image_len_divisible_by=4,
+                                   img_height=args.img_height, image_len_divisible_by=image_len_divisible_by,
                                    verbose=False, training=False)
     log.info(f"data: {len(train_data), len(val_data)}")
     num_outputs = len(encoder.id2char)
