@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Set, List
 
+import albumentations as A
 import cv2
 import numpy as np
 import torch
 import torch.nn.utils.rnn as utils_rnn
+from albumentations.augmentations import functional as AF
+from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
-from torchvision.transforms import functional
 from torchvision.transforms import transforms
 from tqdm.auto import tqdm
 
@@ -77,6 +79,7 @@ class DigitalPeterDataset(Dataset):
                  base_dir: Union[Path, str],
                  uttids: Set[str],
                  encoder: TextEncoder,
+                 img_height=128,
                  image_len_divisible_by=4,
                  training=False,
                  verbose=True,
@@ -91,23 +94,29 @@ class DigitalPeterDataset(Dataset):
         self.keys = []
         self.encoder = encoder
         self.training = training
+        self.img_height = img_height
 
-        def pad_pil_image(img):
-            tail = img.width % image_len_divisible_by
+        def pad_pil_image(img, **params):
+            height, width, _ = img.shape
+            tail = width % image_len_divisible_by
             if tail == 0:
                 return img
             # args for pad: left, top, right, bottom
-            return functional.pad(img, (0, 0, image_len_divisible_by - tail, 0), padding_mode="edge")
+            # return functional.pad(img, (0, 0, image_len_divisible_by - tail, 0), padding_mode="edge")
+            return AF.pad(img, min_height=height, min_width=width + image_len_divisible_by - tail)
 
-        def random_stretch_image(img):
-            return functional.resize(img, (img.height, int(img.width * random.uniform(0.95, 1.05))))
+        def random_stretch_image(img, **params):
+            # return functional.resize(img, (img.height, int(img.width * random.uniform(0.95, 1.05))))
+            height, width, _ = img.shape
+            return AF.resize(img, height, int(width * random.uniform(0.95, 1.05)))
 
-        self.train_transforms = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.RandomRotation(degrees=4, fill=255),
-            transforms.Lambda(random_stretch_image),
-            transforms.Lambda(pad_pil_image),
-            transforms.ToTensor()
+        self.train_transforms = A.Compose([
+            A.Rotate(limit=4),
+            A.Lambda(random_stretch_image, p=0.5),
+            A.Lambda(pad_pil_image, p=0.5),
+            A.GridDistortion(p=0.5),
+            A.ToFloat(max_value=255),
+            ToTensorV2(),
         ])
         self.eval_transforms = transforms.ToTensor()
         self.image_len_divisible_by = image_len_divisible_by
@@ -131,7 +140,7 @@ class DigitalPeterDataset(Dataset):
             self.texts.append(text)
             self.encoded_texts.append(torch.LongTensor(encoded_text))
             img = cv2.imread(f"{imagepath}")
-            img = process_image(img)
+            img = process_image(img, self.img_height)
             width = img.shape[1]
             if width % image_len_divisible_by != 0:
                 right_add = np.full([img.shape[0], image_len_divisible_by - width % image_len_divisible_by, 3], 255,
@@ -149,7 +158,7 @@ class DigitalPeterDataset(Dataset):
         index = self._indices[index]
         img = self.images[index]
         if self.training:
-            img = self.train_transforms(img)
+            img = self.train_transforms(image=img)["image"]
         else:
             img = self.eval_transforms(img)
         return OcrDataItem(self.keys[index], img, self.texts[index], self.encoded_texts[index],

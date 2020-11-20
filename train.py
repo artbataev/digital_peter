@@ -29,7 +29,7 @@ def set_seed():
 
 
 def get_exp_dir(args, num_chars: int) -> Path:
-    model_str = f"{args.model}--{num_chars}"
+    model_str = f"{args.model}--h{args.img_height}--c{num_chars}"
     opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.init_lr}to{args.final_lr}_bs-{args.bs}" \
               f"_optim-{args.optim}-wd{args.wd}"
     exp_dir = f"{model_str}/{opt_str}"
@@ -39,6 +39,8 @@ def get_exp_dir(args, num_chars: int) -> Path:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="base", type=str, help="model name, from models module")
+    parser.add_argument("--img-height", type=int, default=128)
     parser.add_argument("--init-lr", type=float, default=1e-3)
     parser.add_argument("--final-lr", type=float, default=1e-5)
     parser.add_argument("--epochs", type=int, default=24)
@@ -47,8 +49,6 @@ def main():
     parser.add_argument("--optim", type=str, choices={"adam", "adabelief", "sgd"}, default="adam")
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", type=float, default=1e-2, help="weight decay")
-    parser.add_argument("--model", default="base", type=str, help="model name, from models module")
-    parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--from-ckp", type=str, default="")
     parser.add_argument("--exp-dir", type=str, default="exp")
     parser.add_argument("--force", default=False, action="store_true", help="ingore existing dir")
@@ -70,9 +70,12 @@ def main():
         train_uttids = pickle.load(f)
     with open(DATA_DIR / "val_uttids_set.pkl", "rb") as f:
         val_uttids = pickle.load(f)
-    train_data = DigitalPeterDataset(DATA_DIR / "train", train_uttids, encoder, image_len_divisible_by=4,
+    train_data = DigitalPeterDataset(DATA_DIR / "train", train_uttids,
+                                     encoder,
+                                     img_height=args.img_height, image_len_divisible_by=4,
                                      verbose=True, training=True)
-    val_data = DigitalPeterDataset(DATA_DIR / "train", val_uttids, encoder, image_len_divisible_by=4,
+    val_data = DigitalPeterDataset(DATA_DIR / "train", val_uttids, encoder,
+                                   img_height=args.img_height, image_len_divisible_by=4,
                                    verbose=False, training=False)
     log.info(f"data: {len(train_data), len(val_data)}")
     num_outputs = len(encoder.id2char)
@@ -119,15 +122,10 @@ def main():
 
     reduce_lr = optim.lr_scheduler.LambdaLR(optimizer,
                                             lambda epoch: math.exp(math.log(final_lr / init_lr) * epoch / num_epochs))
-    # best_loss = float("infinity")
     best_loss = learner.val_model()
     torch.save(learner.model.state_dict(), exp_dir / "model_best.pt")
     try:
         for i_epoch in range(args.start_ep, num_epochs):
-            # if i_epoch == 0:
-            #     train_data.shuffle_buckets(args.bs, shuffle_parts=False)  # pseudo sortagrad
-            # else:
-            #     train_data.shuffle_buckets(args.bs, shuffle_parts=True)
             log.info("=" * 50)
             log.info(f"epoch: {i_epoch + 1}")
             learner.train_model()
