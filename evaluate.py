@@ -58,6 +58,7 @@ def main():
     parser.add_argument("--from-ckp", type=str)
     parser.add_argument("--img-height", type=int, default=128)
     parser.add_argument("--bs", type=int, default=10, help="batch size")
+    parser.add_argument("--lm", type=str, default="data/lang_mixed_0.7/mixed_0.7.arpa")
     parser.add_argument("--lmwt", type=float, default=1.0)
     parser.add_argument("--wip", type=float, default=2.0)
     parser.add_argument("--eval-mode", action="store_true")
@@ -81,7 +82,7 @@ def main():
     num_processes = multiprocessing.cpu_count() or 12  # can be zero
     parl_decoder = CTCBeamDecoder(
         phones_list,
-        model_path=f"{DATA_DIR / 'lang_mixed_0.7/mixed_0.7.arpa'}",
+        model_path=args.lm,
         alpha=args.lmwt,
         beta=args.wip,
         cutoff_top_n=40,
