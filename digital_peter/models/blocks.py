@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 
 import torch.nn as nn
 
@@ -30,3 +30,22 @@ class SequentialLinear(nn.Module):
 
     def forward(self, sequences, sequence_lengths):
         return self.model(sequences), sequence_lengths
+
+
+class MixtureModel(nn.Module):
+    def __init__(self, models: List[nn.Module], weights: List[float]):
+        super().__init__()
+        self.models = nn.ModuleList(models)
+        self.weights = weights
+        assert len(models) == len(weights)
+
+    def forward(self, images, image_lengths):
+        logits_mix = None
+        logits_lengths = None
+        for model, weight in zip(self.models, self.weights):
+            logits, logits_lengths = model(images, image_lengths)
+            if logits_mix is None:
+                logits_mix = logits * weight
+            else:
+                logits_mix += logits * weight
+        return logits_mix, logits_lengths
