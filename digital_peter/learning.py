@@ -27,7 +27,7 @@ class OcrLearner:
         self.parl_decoder = parl_decoder
         self.log = logging.getLogger(__name__)
 
-    def train_model(self):
+    def train_model(self, reduce_lr=None):
         self.model.train()
         tmp_loss = 0.0
         tmp_loss_num = 0
@@ -51,6 +51,8 @@ class OcrLearner:
                 logging.info(f"loss: {tmp_loss / tmp_loss_num:.5f}")
                 tmp_loss_num = 0
                 tmp_loss = 0.0
+            if reduce_lr is not None:
+                reduce_lr.step()
 
     def get_val_logits(self):
         self.model.eval()

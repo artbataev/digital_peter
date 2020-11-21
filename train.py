@@ -30,7 +30,7 @@ def set_seed():
 
 def get_exp_dir(args, num_chars: int) -> Path:
     model_str = f"{args.model}--h{args.img_height}--c{num_chars}"
-    opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.init_lr}to{args.final_lr}_bs-{args.bs}" \
+    opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.max_lr}-{args.min_lr}-{args.warmup_epochs}_bs-{args.bs}" \
               f"_optim-{args.optim}-wd{args.wd}"
     exp_dir = f"{model_str}/{opt_str}"
     exp_dir = Path(args.exp_dir) / exp_dir
@@ -41,8 +41,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="base", type=str, help="model name, from models module")
     parser.add_argument("--img-height", type=int, default=128)
-    parser.add_argument("--init-lr", type=float, default=1e-3)
-    parser.add_argument("--final-lr", type=float, default=1e-5)
+    parser.add_argument("--max-lr", type=float, default=1e-3)
+    parser.add_argument("--min-lr", type=float, default=1e-5)
+    parser.add_argument("--warmup-epochs", type=int, default=0, help="for cyclic lr")
     parser.add_argument("--epochs", type=int, default=24)
     parser.add_argument("--start-ep", type=int, default=0)
     parser.add_argument("--bs", type=int, default=10, help="batch size")
@@ -100,15 +101,13 @@ def main():
         log_probs_input=True
     )
 
-    init_lr = args.init_lr
-    final_lr = args.final_lr
-    num_epochs = args.epochs
-
     model: nn.Module = getattr(models, args.model)(num_outputs=num_outputs)
     model = model.cuda()
     if args.from_ckp:
         model.load_state_dict(torch.load(args.from_ckp, map_location="cuda"))
     criterion = nn.CTCLoss(blank=0, reduction="none")
+
+    init_lr = args.max_lr if args.warmup_epochs == 0 else args.min_lr
     if args.optim == "adam":
         optimizer = optim.Adam(model.parameters(), lr=init_lr, weight_decay=args.wd)
     elif args.optim == "adabelief":
@@ -121,17 +120,32 @@ def main():
         raise Exception("unknown optimizer")
     learner = OcrLearner(model, optimizer, criterion, train_loader, val_loader, encoder, parl_decoder=parl_decoder)
 
-    reduce_lr = optim.lr_scheduler.LambdaLR(optimizer,
-                                            lambda epoch: math.exp(math.log(final_lr / init_lr) * epoch / num_epochs))
+    num_epochs = args.epochs
+    warmup_epochs = args.warmup_epochs
+    use_cyclic_lr = (warmup_epochs != 0)
+    if use_cyclic_lr:
+        reduce_lr = optim.lr_scheduler.CyclicLR(
+            optimizer, base_lr=args.min_lr, max_lr=args.max_lr,
+            cycle_momentum=(args.optim == "sgd"),
+            step_size_up=len(train_loader) * warmup_epochs,
+            step_size_down=len(train_loader) * (num_epochs - warmup_epochs))
+    else:
+        final_lr = args.min_lr
+        reduce_lr = optim.lr_scheduler.LambdaLR(
+            optimizer,
+            lambda epoch: math.exp(math.log(final_lr / init_lr) * epoch / num_epochs))
     best_loss = learner.val_model()
     torch.save(learner.model.state_dict(), exp_dir / "model_best.pt")
     try:
-        for i_epoch in range(args.start_ep, num_epochs):
+        for i_epoch in range(num_epochs):
+            if i_epoch < args.start_ep:
+                continue
             log.info("=" * 50)
             log.info(f"epoch: {i_epoch + 1}")
-            learner.train_model()
+            learner.train_model(reduce_lr if use_cyclic_lr else None)
             cur_loss = learner.val_model()
-            reduce_lr.step()
+            if not use_cyclic_lr:
+                reduce_lr.step()
             if best_loss < cur_loss:
                 log.info(f"not improved {best_loss:.5f} < {cur_loss:.5f}")
                 torch.save(learner.model.state_dict(), exp_dir / "model_last.pt")
