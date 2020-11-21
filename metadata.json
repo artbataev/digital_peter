@@ -1,4 +1,4 @@
 {
   "image": "artbataev/dpeter:latest",
-  "entry_point": "python evaluate.py --eval-mode --model=conv__gru_2x256_drop02 --from-ckp=submit_data_1/model_conv_gru_2x256_alb.pt --lm=submit_data_1/mixed_0.7.arpa --lmwt=0.9 --wip=2.0"
+  "entry_point": "python evaluate.py --model=conv__gru_2x256_drop02 --from-ckp=submit_data_2/model_conv_gru_2x256_cycllrsgd1.pt --lm=submit_data_2/mixed_0.7.arpa --lmwt=0.7 --wip=2.0 --eval-mode"
 }
