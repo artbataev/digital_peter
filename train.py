@@ -144,6 +144,9 @@ def main():
             log.info(f"epoch: {i_epoch + 1}")
             learner.train_model(reduce_lr if use_cyclic_lr else None)
             cur_loss = learner.val_model()
+            if cur_loss > 150.0:
+                log.warning(f"loss is too high, something bad happened: {cur_loss:.5f}")
+                break
             if not use_cyclic_lr:
                 reduce_lr.step()
             if best_loss < cur_loss:
