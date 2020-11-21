@@ -30,7 +30,9 @@ def set_seed():
 
 def get_exp_dir(args, num_chars: int) -> Path:
     model_str = f"{args.model}--h{args.img_height}--c{num_chars}"
-    opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.max_lr}-{args.min_lr}-{args.warmup_epochs}_bs-{args.bs}" \
+    one_cycle_text = "oclr" if args.one_cycle_policy else ""
+    opt_str = f"ep-{args.start_ep}to{args.epochs}_lr-{args.max_lr}-{args.min_lr}"\
+              f"-{one_cycle_text or args.warmup_epochs}_bs-{args.bs}" \
               f"_optim-{args.optim}-wd{args.wd}"
     exp_dir = f"{model_str}/{opt_str}"
     exp_dir = Path(args.exp_dir) / exp_dir
@@ -53,6 +55,7 @@ def main():
     parser.add_argument("--from-ckp", type=str, default="")
     parser.add_argument("--exp-dir", type=str, default="exp")
     parser.add_argument("--force", default=False, action="store_true", help="ingore existing dir")
+    parser.add_argument("--one-cycle-policy", action="store_true")
     args = parser.parse_args()
 
     set_seed()
@@ -107,7 +110,7 @@ def main():
         model.load_state_dict(torch.load(args.from_ckp, map_location="cuda"))
     criterion = nn.CTCLoss(blank=0, reduction="none")
 
-    init_lr = args.max_lr if args.warmup_epochs == 0 else args.min_lr
+    init_lr = args.max_lr
     if args.optim == "adam":
         optimizer = optim.Adam(model.parameters(), lr=init_lr, weight_decay=args.wd)
     elif args.optim == "adabelief":
@@ -122,13 +125,19 @@ def main():
 
     num_epochs = args.epochs
     warmup_epochs = args.warmup_epochs
-    use_cyclic_lr = (warmup_epochs != 0)
+    use_cyclic_lr = (warmup_epochs != 0) or args.one_cycle_policy
     if use_cyclic_lr:
-        reduce_lr = optim.lr_scheduler.CyclicLR(
-            optimizer, base_lr=args.min_lr, max_lr=args.max_lr,
-            cycle_momentum=(args.optim == "sgd"),
-            step_size_up=len(train_loader) * warmup_epochs,
-            step_size_down=len(train_loader) * (num_epochs - warmup_epochs))
+        if args.one_cycle_policy:
+            reduce_lr = optim.lr_scheduler.OneCycleLR(optimizer,
+                                                      max_lr=args.max_lr,
+                                                      epochs=num_epochs,
+                                                      steps_per_epoch=len(train_loader))
+        else:
+            reduce_lr = optim.lr_scheduler.CyclicLR(
+                optimizer, base_lr=args.min_lr, max_lr=args.max_lr,
+                cycle_momentum=(args.optim == "sgd"),
+                step_size_up=len(train_loader) * warmup_epochs,
+                step_size_down=len(train_loader) * (num_epochs - warmup_epochs))
     else:
         final_lr = args.min_lr
         reduce_lr = optim.lr_scheduler.LambdaLR(
@@ -156,6 +165,8 @@ def main():
                 log.info(f"improved {best_loss:.5f} -> {cur_loss:.5f}")
                 best_loss = cur_loss
                 torch.save(learner.model.state_dict(), exp_dir / "model_best.pt")
+            if i_epoch + 5 >= num_epochs:
+                torch.save(learner.model.state_dict(), exp_dir / f"model_ep{i_epoch + 1}.pt")
     except KeyboardInterrupt:
         log.warning("training interruped")
 
