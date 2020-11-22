@@ -16,8 +16,8 @@ from digital_peter import models
 from digital_peter.data import OcrDataBatch, DigitalPeterDataset, DigitalPeterEvalDataset, collate_fn
 from digital_peter.learning import OcrLearner
 from digital_peter.logging_utils import setup_logger
+from digital_peter.models.utils import update_bn_stats
 from digital_peter.text import TextEncoder, get_chars_from_file
-# from digital_peter.models.utils import update_bn_stats
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -65,6 +65,7 @@ def main():
     parser.add_argument("--eval-mode", action="store_true")
     parser.add_argument("--test-img-dir", default="/data")
     parser.add_argument("--test-hyps-dir", default="/output")
+    parser.add_argument("--adapt", action="store_true", help="update batchnorm stats using test data")
     args = parser.parse_args()
 
     setup_logger()
@@ -101,8 +102,10 @@ def main():
     if args.eval_mode:
         test_data = DigitalPeterEvalDataset(Path(args.test_img_dir),
                                             img_height=args.img_height, image_len_divisible_by=4)
-        eval_loader = DataLoader(test_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
-        utt2hyp = get_utt2hyp(model, eval_loader, parl_decoder, encoder)
+        loader = DataLoader(test_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
+        if args.adapt:
+            update_bn_stats(model, loader)
+        utt2hyp = get_utt2hyp(model, loader, parl_decoder, encoder)
         write_utt2hyp(utt2hyp, Path(args.test_hyps_dir))
     else:
         with open(DATA_DIR / "val_uttids_set.pkl", "rb") as f:
@@ -113,10 +116,11 @@ def main():
                                        verbose=False, training=False)
         log.info(f"data: {len(val_data)}")
 
-        val_loader = DataLoader(val_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
+        loader = DataLoader(val_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
         criterion = nn.CTCLoss(blank=0, reduction="none")
-        # update_bn_stats(model, val_loader)
-        learner = OcrLearner(model, None, criterion, None, val_loader, encoder, parl_decoder=parl_decoder)
+        if args.adapt:
+            update_bn_stats(model, loader)
+        learner = OcrLearner(model, None, criterion, None, loader, encoder, parl_decoder=parl_decoder)
         learner.val_model(greedy=False)
 
 
