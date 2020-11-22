@@ -1,4 +1,4 @@
 {
   "image": "artbataev/dpeter:latest",
-  "entry_point": "python evaluate.py --model=conv__gru_2x368_drop02 --from-ckp=model_weights/conv__gru_2x368_drop02_sgd_cycle_retrain.pt --lmwt=0.8 --wip=2.0 --eval-mode"
+  "entry_point": "python evaluate.py --model=conv_deeper__gru_2x368_drop02 --from-ckp=model_weights/conv_deeper__gru_2x368_drop02__sgdretrain.pt --bs=4 --lmwt=0.8 --wip=2.0 --eval-mode"
 }
