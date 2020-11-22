@@ -22,13 +22,16 @@ if __name__ == "__main__":
                                      img_height=128, image_len_divisible_by=4,
                                      verbose=False, training=False)
     train_loader = DataLoader(train_data, batch_size=10, shuffle=True, collate_fn=collate_fn)
+    # exp_dir = "exp/conv__gru_2x368_drop02--h128--c62/ep-0to32_lr-0.01-1e-06-4_bs-10_optim-sgd-wd0.01"
+    exp_dir = "exp/retrain/conv__gru_2x368_drop02--h128--c62/ep-0to6_lr-1e-06-1e-08-0_bs-10_optim-sgd-wd0.01"
+    ep_start = 4
+    ep_end = 6
     model_weigths = make_avg_model_from_checkpoints([
-        f"exp/conv__gru_2x368_drop02--h128--c62/ep-0to32_lr-0.01-1e-06-4_bs-10_optim-sgd-wd0.01/model_ep{epoch}.pt"
-        for epoch in range(30, 32 + 1)
+        f"{exp_dir}/model_ep{epoch}.pt"
+        for epoch in range(ep_start, ep_end + 1)
     ])
     model = models.conv__gru_2x368_drop02(num_outputs)
     model.load_state_dict(model_weigths)
     model.cuda()
     update_bn_stats(model, train_loader)
-    torch.save(model.state_dict(),
-               "exp/conv__gru_2x368_drop02--h128--c62/ep-0to32_lr-0.01-1e-06-4_bs-10_optim-sgd-wd0.01/model_ep30-32.pt")
+    torch.save(model.state_dict(), f"{exp_dir}/model_ep{ep_start}-{ep_end}.pt")
