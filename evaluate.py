@@ -59,7 +59,7 @@ def main():
     parser.add_argument("--from-ckp", type=str)
     parser.add_argument("--img-height", type=int, default=128)
     parser.add_argument("--bs", type=int, default=10, help="batch size")
-    parser.add_argument("--lm", type=str, default="data/lang_mixed_0.7/mixed_0.7.arpa")
+    parser.add_argument("--lm", type=str, default="data/lang/lm_train_geval17_06_wbimaxent_0.8.gz")
     parser.add_argument("--lmwt", type=float, default=1.0)
     parser.add_argument("--wip", type=float, default=2.0)
     parser.add_argument("--eval-mode", action="store_true")
