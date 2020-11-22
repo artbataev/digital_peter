@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from tqdm.auto import tqdm
 
 from digital_peter.data import OcrDataBatch
+from digital_peter.text import calc_metrics
 
 
 class OcrLearner:
@@ -129,7 +130,7 @@ class OcrLearner:
 
         loss_accum /= num_items
         self.log.info(f"loss: {loss_accum:.5f}")
-        _ = self.calc_metrics(utt2hyp, utt2ref)
+        _ = calc_metrics(utt2hyp, utt2ref)
         return loss_accum
 
         # not used now
@@ -164,7 +165,7 @@ class OcrLearner:
             for key, raw_hyp in zip(keys, utterances):
                 utt2hyp[key] = self.encoder.decode(raw_hyp).strip()
 
-        _ = self.calc_metrics(utt2hyp, utt2ref)
+        _ = calc_metrics(utt2hyp, utt2ref)
         for key in sorted(utt2hyp.keys()):
             hyp = utt2hyp[key]
             hyp_old = utt2hyp_old[key]
@@ -172,23 +173,3 @@ class OcrLearner:
             print(f"{key}: {hyp_old} -> {hyp} | {ref}")
             print(f"{editdistance.eval(hyp_old, ref)} -> {editdistance.eval(hyp, ref)}")
         return loss_accum
-
-    def calc_metrics(self, utt2hyp: Dict[str, str], utt2ref: Dict[str, str]):
-        error_chars = 0
-        total_chars = 0
-        error_words = 0
-        total_words = 0
-
-        for i, (key, hyp) in enumerate(utt2hyp.items()):
-            ref = utt2ref[key]
-            total_chars += len(ref)
-            total_words += len(ref.split())
-            error_chars += editdistance.eval(hyp, ref)
-            error_words += editdistance.eval(hyp.split(), ref.split())
-            if i < 20:
-                self.log.info(f"ref: {ref}")
-                self.log.info(f"hyp: {hyp}")
-        cer = error_chars / total_chars
-        wer = error_words / total_words
-        self.log.info(f"CER: {cer * 100:.2f}%, WER: {wer * 100:.2f}%")
-        return cer, wer
