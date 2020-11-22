@@ -17,6 +17,7 @@ from digital_peter.data import OcrDataBatch, DigitalPeterDataset, DigitalPeterEv
 from digital_peter.learning import OcrLearner
 from digital_peter.logging_utils import setup_logger
 from digital_peter.text import TextEncoder, get_chars_from_file
+# from digital_peter.models.utils import update_bn_stats
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -114,6 +115,7 @@ def main():
 
         val_loader = DataLoader(val_data, batch_size=args.bs, shuffle=False, collate_fn=collate_fn)
         criterion = nn.CTCLoss(blank=0, reduction="none")
+        # update_bn_stats(model, val_loader)
         learner = OcrLearner(model, None, criterion, None, val_loader, encoder, parl_decoder=parl_decoder)
         learner.val_model(greedy=False)
 
