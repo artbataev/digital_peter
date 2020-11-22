@@ -23,6 +23,8 @@ def make_avg_model_from_checkpoints(checkpoints: List[str]):
     avg_weights = weights[0]
     num_models = float(len(checkpoints))
     for key in avg_weights:
+        if key.endswith("num_batches_tracked"):
+            continue
         for other_weights in weights[1:]:
             avg_weights[key] += other_weights[key]
         avg_weights[key] /= num_models
