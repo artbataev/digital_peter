@@ -1,9 +1,10 @@
 import itertools
-from typing import Set, List, Dict
+import logging
 import pickle
 from collections import Counter
+from typing import Set, List, Dict
+
 import editdistance
-import logging
 
 
 class TextEncoder:
@@ -59,6 +60,7 @@ def calc_metrics(utt2hyp: Dict[str, str], utt2ref: Dict[str, str]):
     total_chars = 0
     error_words = 0
     total_words = 0
+    error_sentences = 0
     log = logging.getLogger(__name__)
 
     for i, (uttid, hyp) in enumerate(utt2hyp.items()):
@@ -67,10 +69,14 @@ def calc_metrics(utt2hyp: Dict[str, str], utt2ref: Dict[str, str]):
         total_words += len(ref.split())
         error_chars += editdistance.eval(hyp, ref)
         error_words += editdistance.eval(hyp.split(), ref.split())
+        if ref != hyp:
+            error_sentences += 1
         if i < 20:
             log.info(f"{uttid} ref: {ref}")
             log.info(f"{uttid} hyp: {hyp}")
     cer = error_chars / total_chars
     wer = error_words / total_words
-    log.info(f"CER: {cer * 100:.2f}%, WER: {wer * 100:.2f}%")
+    num_sentences = len(utt2hyp)
+    sentence_accuracy = (num_sentences - error_sentences) / num_sentences
+    log.info(f"CER: {cer * 100:.3f}%, WER: {wer * 100:.3f}%, SACC: {sentence_accuracy * 100:.3f}%")
     return cer, wer
