@@ -18,7 +18,7 @@ class RNNEncoder(nn.Module):
 
     def forward(self, sequences, sequence_lengths):
         output = self.rnn_dropout(sequences)
-        output = utils_rnn.pack_padded_sequence(output, sequence_lengths, batch_first=False)
+        output = utils_rnn.pack_padded_sequence(output, sequence_lengths.cpu(), batch_first=False)
         output = self.rnn(output)[0]
         output = utils_rnn.pad_packed_sequence(output)[0]
         return output, sequence_lengths  # LxBxC, B
